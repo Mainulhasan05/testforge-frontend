@@ -17,6 +17,7 @@ import {
 import { Building2, LogOut, User, Menu } from "lucide-react";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import Cookie from "js-cookie";
 
 export default function AppLayout({ children }) {
   const { user } = useSelector((state) => state.auth);
@@ -25,7 +26,11 @@ export default function AppLayout({ children }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
-    await dispatch(logout());
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("authUser");
+    Cookie.remove("authToken");
+    Cookie.remove("authUser");
+    dispatch(logout());
     router.push("/login");
   };
 
