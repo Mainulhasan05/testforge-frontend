@@ -48,7 +48,7 @@ export default function SessionsList({ orgId }) {
     endDate: "",
   });
   const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("");
 
   useEffect(() => {
     if (orgId) {
@@ -101,7 +101,7 @@ export default function SessionsList({ orgId }) {
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="">All statuses</SelectItem>
               <SelectItem value="active">Active</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
               <SelectItem value="archived">Archived</SelectItem>
