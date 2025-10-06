@@ -55,7 +55,11 @@ export default function SessionsList({ orgId }) {
       dispatch(
         fetchSessions({
           orgId,
-          params: { page, limit: 10, status: statusFilter },
+          params: {
+            page,
+            limit: 10,
+            status: statusFilter == "all" ? "" : statusFilter,
+          },
         })
       );
     }
@@ -101,7 +105,7 @@ export default function SessionsList({ orgId }) {
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All statuses</SelectItem>
+              <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="active">Active</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
               <SelectItem value="archived">Archived</SelectItem>

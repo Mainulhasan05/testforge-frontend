@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Building2, LogOut, User, Menu } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import Cookie from "js-cookie";
 
@@ -24,6 +24,8 @@ export default function AppLayout({ children }) {
   const dispatch = useDispatch();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const handleLogout = async () => {
     localStorage.removeItem("authToken");
@@ -110,7 +112,7 @@ export default function AppLayout({ children }) {
                 >
                   <Avatar>
                     <AvatarFallback>
-                      {user ? getInitials(user?.fullName) : "U"}
+                      {mounted && user ? getInitials(user.fullName) : "U"}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
