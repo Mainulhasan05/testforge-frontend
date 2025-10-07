@@ -31,6 +31,8 @@ export default function AppLayout({ children }) {
     localStorage.removeItem("authToken");
     localStorage.removeItem("authUser");
     Cookie.remove("authToken");
+    // authRefreshToken
+    Cookie.remove("authRefreshToken");
     Cookie.remove("authUser");
     dispatch(logout());
     router.push("/login");

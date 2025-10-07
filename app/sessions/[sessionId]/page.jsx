@@ -1,45 +1,96 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useDispatch, useSelector } from "react-redux"
-import { useParams } from "next/navigation"
-import { fetchSessionById } from "@/lib/slices/sessionsSlice"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import AppLayout from "@/components/layout/app-layout"
-import FeaturesList from "@/components/features/features-list"
-import ActivityFeed from "@/components/activity/activity-feed"
-import { formatLocalDate } from "@/lib/utils/time"
-import { PlayCircle, Calendar, Users } from "lucide-react"
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useParams } from "next/navigation";
+import {
+  fetchSessionById,
+  assignUserToSession,
+  unassignUserFromSession,
+} from "@/lib/slices/sessionsSlice";
+import { fetchOrgMembers } from "@/lib/slices/orgsSlice";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import AppLayout from "@/components/layout/app-layout";
+import FeaturesList from "@/components/features/features-list";
+import { formatLocalDate } from "@/lib/utils/time";
+import { PlayCircle, Calendar, Users, UserPlus } from "lucide-react";
 
 export default function SessionDetailPage() {
-  const params = useParams()
-  const sessionId = params.sessionId
-  const dispatch = useDispatch()
-  const { currentSession } = useSelector((state) => state.sessions)
-  const [activeTab, setActiveTab] = useState("overview")
+  const params = useParams();
+  const sessionId = params.sessionId;
+  const dispatch = useDispatch();
+  const { currentSession } = useSelector((state) => state.sessions);
+  const { members } = useSelector((state) => state.orgs);
+  const [isAssignOpen, setIsAssignOpen] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState("");
 
   useEffect(() => {
     if (sessionId) {
-      dispatch(fetchSessionById(sessionId))
+      dispatch(fetchSessionById(sessionId));
     }
-  }, [dispatch, sessionId])
+  }, [dispatch, sessionId]);
+
+  useEffect(() => {
+    if (currentSession?.orgId) {
+      dispatch(fetchOrgMembers(currentSession.orgId?._id));
+    }
+  }, [dispatch, currentSession?.orgId?._id]);
+
+  const handleAssign = async () => {
+    if (!selectedUserId) return;
+    try {
+      await dispatch(
+        assignUserToSession({ sessionId, userId: selectedUserId })
+      ).unwrap();
+      setIsAssignOpen(false);
+      setSelectedUserId("");
+    } catch (err) {
+      console.error("[v0] Failed to assign user:", err);
+      alert(err.message || "Failed to assign user");
+    }
+  };
+
+  const handleUnassign = async (userId) => {
+    try {
+      await dispatch(unassignUserFromSession({ sessionId, userId })).unwrap();
+    } catch (err) {
+      console.error("[v0] Failed to unassign user:", err);
+    }
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
       case "active":
-        return "default"
+        return "default";
       case "completed":
-        return "secondary"
+        return "secondary";
       case "archived":
-        return "outline"
+        return "outline";
       default:
-        return "secondary"
+        return "secondary";
     }
-  }
+  };
 
   const getInitials = (name) => {
     return name
@@ -47,8 +98,13 @@ export default function SessionDetailPage() {
       .map((n) => n[0])
       .join("")
       .toUpperCase()
-      .slice(0, 2)
-  }
+      .slice(0, 2);
+  };
+
+  const unassignedMembers = members.filter(
+    (member) =>
+      !currentSession?.assignees?.some((a) => a.userId === member.userId)
+  );
 
   if (!currentSession) {
     return (
@@ -58,7 +114,7 @@ export default function SessionDetailPage() {
           <Skeleton className="h-64 w-full" />
         </div>
       </AppLayout>
-    )
+    );
   }
 
   return (
@@ -72,92 +128,141 @@ export default function SessionDetailPage() {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <h1 className="text-3xl font-bold">{currentSession.title}</h1>
-                <Badge variant={getStatusColor(currentSession.status)}>{currentSession.status}</Badge>
+                <Badge variant={getStatusColor(currentSession.status)}>
+                  {currentSession.status}
+                </Badge>
               </div>
-              <p className="text-muted-foreground">{currentSession.description || "No description"}</p>
+              <p className="text-muted-foreground">
+                {currentSession.description || "No description"}
+              </p>
             </div>
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3 lg:w-auto">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="features">Features</TabsTrigger>
-            <TabsTrigger value="activity">Activity</TabsTrigger>
-          </TabsList>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Timeline
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div>
+                <p className="text-sm text-muted-foreground">Start Date</p>
+                <p className="font-medium">
+                  {currentSession.startDate
+                    ? formatLocalDate(currentSession.startDate)
+                    : "Not set"}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">End Date</p>
+                <p className="font-medium">
+                  {currentSession.endDate
+                    ? formatLocalDate(currentSession.endDate)
+                    : "Not set"}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
 
-          <TabsContent value="overview" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    Timeline
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Start Date</p>
-                    <p className="font-medium">
-                      {currentSession.startDate ? formatLocalDate(currentSession.startDate) : "Not set"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">End Date</p>
-                    <p className="font-medium">
-                      {currentSession.endDate ? formatLocalDate(currentSession.endDate) : "Not set"}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Assignees
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {currentSession.assignees && currentSession.assignees.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {currentSession.assignees.map((assignee) => (
-                        <div key={assignee.userId} className="flex items-center gap-2">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="text-xs">
-                              {getInitials(assignee.user?.name || "U")}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="text-sm">{assignee.user?.name}</span>
-                        </div>
-                      ))}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Assignees
+                </CardTitle>
+                <Dialog open={isAssignOpen} onOpenChange={setIsAssignOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" variant="outline">
+                      <UserPlus className="h-4 w-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Assign Member</DialogTitle>
+                      <DialogDescription>
+                        Assign a team member to this session
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="member">Select Member</Label>
+                        <Select
+                          value={selectedUserId}
+                          onValueChange={setSelectedUserId}
+                        >
+                          <SelectTrigger id="member">
+                            <SelectValue placeholder="Choose a member" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {unassignedMembers.map((member) => (
+                              <SelectItem
+                                key={member.userId}
+                                value={member.userId}
+                              >
+                                {member.user?.name || member.user?.email}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No assignees yet</p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                    <DialogFooter>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsAssignOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button onClick={handleAssign} disabled={!selectedUserId}>
+                        Assign
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {currentSession.assignees &&
+              currentSession.assignees.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {currentSession.assignees.map((assignee) => (
+                    <div
+                      key={assignee._id}
+                      className="flex items-center gap-2 bg-secondary/50 rounded-full pl-1 pr-3 py-1"
+                    >
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className="text-xs">
+                          {getInitials(assignee?.fullName || "U")}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm">{assignee?.fullName}</span>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-4 w-4 p-0 hover:bg-destructive/20"
+                        onClick={() => handleUnassign(assignee._id)}
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No assignees yet
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Description</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm">{currentSession.description || "No description provided"}</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="features" className="space-y-4">
-            <FeaturesList sessionId={sessionId} />
-          </TabsContent>
-
-          <TabsContent value="activity" className="space-y-4">
-            <ActivityFeed entityType="session" entityId={sessionId} />
-          </TabsContent>
-        </Tabs>
+        <FeaturesList sessionId={sessionId} />
       </div>
     </AppLayout>
-  )
+  );
 }

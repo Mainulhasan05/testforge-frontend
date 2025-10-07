@@ -54,7 +54,7 @@ export default function OrgDetailPage() {
               </p>
             </div>
           </div>
-          <Badge variant="secondary">{members?.length} members</Badge>
+          <Badge variant="secondary">{members.length} members</Badge>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
