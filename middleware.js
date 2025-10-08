@@ -8,8 +8,15 @@ export function middleware(request) {
   // Check if user is authenticated
   const isAuthenticated = !!token;
 
+  // forgot-password, reset-password
+
   // Define public paths
-  const publicPaths = ["/login", "/signup"];
+  const publicPaths = [
+    "/login",
+    "/signup",
+    "/forgot-password",
+    "/reset-password",
+  ];
   const isPublicPath = publicPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)
   );

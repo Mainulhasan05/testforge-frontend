@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useRouter } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -15,9 +16,11 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft, Mail } from "lucide-react";
 import Link from "next/link";
-import { fakeApi } from "@/lib/fakeApi";
+// import { fakeApi } from "@/lib/fakeApi";
+import { realApi } from "@/lib/realApi";
 
 export default function ForgotPasswordPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState("idle"); // idle, loading, success, error
   const [error, setError] = useState(null);
@@ -29,9 +32,10 @@ export default function ForgotPasswordPage() {
     setError(null);
 
     try {
-      const response = await fakeApi.auth.forgotPassword({ email });
+      const response = await realApi.auth.forgotPassword(email);
       setStatus("success");
-      setResetToken(response.data.token); // Only for demo purposes
+      //   router.push("/login");
+      //   setResetToken(response.data.token); // Only for demo purposes
     } catch (err) {
       setStatus("error");
       setError(err.message || "Failed to send reset email");
