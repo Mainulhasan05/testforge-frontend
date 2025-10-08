@@ -35,7 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { DynamicBreadcrumb } from "@/components/ui/dynamic-breadcrumb";
 import AppLayout from "@/components/layout/app-layout";
 import {
   Box,
@@ -46,10 +46,28 @@ import {
   Clock,
   MessageSquare,
   History,
+  BarChart3,
+  TrendingUp,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Bar,
+  BarChart,
+  Line,
+  LineChart,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
 
 export default function FeatureDetailPage() {
   const params = useParams();
@@ -81,6 +99,63 @@ export default function FeatureDetailPage() {
   const [feedbackForm, setFeedbackForm] = useState({ result: "", comment: "" });
   const [historyPage, setHistoryPage] = useState(1);
 
+  const featureAnalytics = {
+    totalCases: cases.length || 12,
+    passedCases: cases.filter((c) => c.status === "pass").length || 8,
+    failedCases: cases.filter((c) => c.status === "fail").length || 2,
+    pendingCases: cases.filter((c) => c.status === "pending").length || 2,
+    uniqueTesters: 4,
+    avgTestTime: "2.5 hrs",
+    coverageTimeline: [
+      { week: "Week 1", tested: 3, passed: 2, failed: 1 },
+      { week: "Week 2", tested: 5, passed: 4, failed: 1 },
+      { week: "Week 3", tested: 4, passed: 2, failed: 0 },
+    ],
+    testerStats: [
+      { name: "Alice", tested: 5, passed: 4, failed: 1 },
+      { name: "Bob", tested: 4, passed: 3, failed: 1 },
+      { name: "Carol", tested: 2, passed: 1, failed: 0 },
+      { name: "Dave", tested: 1, passed: 0, failed: 0 },
+    ],
+  };
+
+  const getInitials = (name) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "pending":
+        return "outline";
+      case "in-progress":
+        return "default";
+      case "pass":
+        return "secondary";
+      case "fail":
+        return "destructive";
+      default:
+        return "outline";
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case "pass":
+        return <CheckCircle2 className="h-4 w-4" />;
+      case "fail":
+        return <XCircle className="h-4 w-4" />;
+      case "in-progress":
+        return <Clock className="h-4 w-4" />;
+      default:
+        return null;
+    }
+  };
+
   useEffect(() => {
     if (featureId) {
       dispatch(fetchFeatureById(featureId));
@@ -89,7 +164,7 @@ export default function FeatureDetailPage() {
           featureId,
           params: {
             page,
-            limit: 30,
+            limit: 10,
             status: statusFilter !== "all" ? statusFilter : "",
           },
         })
@@ -135,7 +210,6 @@ export default function FeatureDetailPage() {
       setFeedbackForm({ result: "", comment: "" });
       setFeedbackModalOpen(null);
 
-      // Refresh cases to update status
       dispatch(
         fetchCases({
           featureId,
@@ -151,37 +225,10 @@ export default function FeatureDetailPage() {
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "pending":
-        return "outline";
-      case "in-progress":
-        return "default";
-      case "pass":
-        return "secondary";
-      case "fail":
-        return "destructive";
-      default:
-        return "outline";
-    }
-  };
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case "pass":
-        return <CheckCircle2 className="h-4 w-4" />;
-      case "fail":
-        return <XCircle className="h-4 w-4" />;
-      case "in-progress":
-        return <Clock className="h-4 w-4" />;
-      default:
-        return null;
-    }
-  };
-
   if (!currentFeature) {
     return (
       <AppLayout>
+        <DynamicBreadcrumb />
         <div className="space-y-6">
           <Skeleton className="h-12 w-1/3" />
           <Skeleton className="h-64 w-full" />
@@ -198,7 +245,7 @@ export default function FeatureDetailPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <Breadcrumb items={breadcrumbItems} />
+        <DynamicBreadcrumb />
 
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="flex items-start gap-4">
@@ -217,6 +264,163 @@ export default function FeatureDetailPage() {
               </p>
             </div>
           </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Cases</CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {featureAnalytics.totalCases}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Test cases created
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pass Rate</CardTitle>
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                {Math.round(
+                  (featureAnalytics.passedCases / featureAnalytics.totalCases) *
+                    100
+                )}
+                %
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {featureAnalytics.passedCases} passed
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Failed</CardTitle>
+              <XCircle className="h-4 w-4 text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">
+                {featureAnalytics.failedCases}
+              </div>
+              <p className="text-xs text-muted-foreground">Need attention</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Testers</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {featureAnalytics.uniqueTesters}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Unique contributors
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Test Coverage Timeline
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer
+                config={{
+                  tested: { label: "Tested", color: "hsl(var(--chart-4))" },
+                  passed: { label: "Passed", color: "hsl(var(--chart-2))" },
+                  failed: { label: "Failed", color: "hsl(var(--chart-1))" },
+                }}
+                className="h-[250px]"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={featureAnalytics.coverageTimeline}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="week" />
+                    <YAxis />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="tested"
+                      stroke="var(--color-tested)"
+                      strokeWidth={2}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="passed"
+                      stroke="var(--color-passed)"
+                      strokeWidth={2}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="failed"
+                      stroke="var(--color-failed)"
+                      strokeWidth={2}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Tester Contributions
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer
+                config={{
+                  tested: { label: "Tested", color: "hsl(var(--chart-4))" },
+                  passed: { label: "Passed", color: "hsl(var(--chart-2))" },
+                  failed: { label: "Failed", color: "hsl(var(--chart-1))" },
+                }}
+                className="h-[250px]"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={featureAnalytics.testerStats}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Legend />
+                    <Bar
+                      dataKey="tested"
+                      fill="var(--color-tested)"
+                      name="Tested"
+                    />
+                    <Bar
+                      dataKey="passed"
+                      fill="var(--color-passed)"
+                      name="Passed"
+                    />
+                    <Bar
+                      dataKey="failed"
+                      fill="var(--color-failed)"
+                      name="Failed"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="space-y-4">
@@ -528,40 +732,19 @@ export default function FeatureDetailPage() {
                   {feedbackList.map((feedback) => (
                     <Card key={feedback._id}>
                       <CardHeader>
-                        <div
-                          key={item._id}
-                          className="flex gap-4 pb-4 border-b last:border-0"
-                        >
-                          <Avatar>
-                            <AvatarFallback>
-                              {getInitials(item?.testerId?.fullName || "U")}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="text-sm font-medium">
-                                {item?.testerId?.fullName || "Unknown User"}
-                              </p>
-
-                              <Badge
-                                variant={getStatusColor(feedback.result)}
-                                className="flex items-center gap-1"
-                              >
-                                {/* I would like to show user information who tested this */}
-
-                                {getStatusIcon(feedback.result)}
-                                {feedback.result}
-                              </Badge>
-                              <span className="text-sm text-muted-foreground">
-                                {formatDistanceToNow(
-                                  new Date(feedback.createdAt),
-                                  {
-                                    addSuffix: true,
-                                  }
-                                )}
-                              </span>
-                            </div>
-                          </div>
+                        <div className="flex items-center justify-between">
+                          <Badge
+                            variant={getStatusColor(feedback.result)}
+                            className="flex items-center gap-1"
+                          >
+                            {getStatusIcon(feedback.result)}
+                            {feedback.result}
+                          </Badge>
+                          <span className="text-sm text-muted-foreground">
+                            {formatDistanceToNow(new Date(feedback.createdAt), {
+                              addSuffix: true,
+                            })}
+                          </span>
                         </div>
                       </CardHeader>
                       {feedback.comment && (

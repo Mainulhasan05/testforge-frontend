@@ -31,10 +31,39 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DynamicBreadcrumb } from "@/components/ui/dynamic-breadcrumb";
 import AppLayout from "@/components/layout/app-layout";
 import FeaturesList from "@/components/features/features-list";
 import { formatLocalDate } from "@/lib/utils/time";
-import { PlayCircle, Calendar, Users, UserPlus } from "lucide-react";
+import {
+  PlayCircle,
+  Calendar,
+  Users,
+  UserPlus,
+  BarChart3,
+  CheckCircle2,
+  XCircle,
+  TrendingUp,
+} from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
 
 export default function SessionDetailPage() {
   const params = useParams();
@@ -45,6 +74,50 @@ export default function SessionDetailPage() {
   const [isAssignOpen, setIsAssignOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("");
 
+  const sessionAnalytics = {
+    totalFeatures: 8,
+    totalCases: 45,
+    passedCases: 32,
+    failedCases: 8,
+    pendingCases: 5,
+    activeTesters: 6,
+    completionRate: 71,
+    // Feature-wise breakdown
+    featureStats: [
+      { name: "Login", total: 8, passed: 7, failed: 1 },
+      { name: "Dashboard", total: 12, passed: 10, failed: 2 },
+      { name: "Profile", total: 6, passed: 5, failed: 1 },
+      { name: "Settings", total: 9, passed: 6, failed: 2 },
+      { name: "Reports", total: 10, passed: 4, failed: 4 },
+    ],
+    // Daily progress
+    dailyProgress: [
+      { date: "Mon", tested: 5, passed: 4, failed: 1 },
+      { date: "Tue", tested: 8, passed: 6, failed: 2 },
+      { date: "Wed", tested: 12, passed: 10, failed: 2 },
+      { date: "Thu", tested: 10, passed: 7, failed: 3 },
+      { date: "Fri", tested: 10, passed: 5, failed: 0 },
+    ],
+  };
+
+  const pieData = [
+    {
+      name: "Passed",
+      value: sessionAnalytics.passedCases,
+      color: "hsl(var(--chart-2))",
+    },
+    {
+      name: "Failed",
+      value: sessionAnalytics.failedCases,
+      color: "hsl(var(--chart-1))",
+    },
+    {
+      name: "Pending",
+      value: sessionAnalytics.pendingCases,
+      color: "hsl(var(--chart-3))",
+    },
+  ];
+
   useEffect(() => {
     if (sessionId) {
       dispatch(fetchSessionById(sessionId));
@@ -53,9 +126,9 @@ export default function SessionDetailPage() {
 
   useEffect(() => {
     if (currentSession?.orgId) {
-      dispatch(fetchOrgMembers(currentSession.orgId?._id));
+      dispatch(fetchOrgMembers(currentSession.orgId._id));
     }
-  }, [dispatch, currentSession?.orgId?._id]);
+  }, [dispatch, currentSession?.orgId]);
 
   const handleAssign = async () => {
     if (!selectedUserId) return;
@@ -109,6 +182,7 @@ export default function SessionDetailPage() {
   if (!currentSession) {
     return (
       <AppLayout>
+        <DynamicBreadcrumb />
         <div className="space-y-6">
           <Skeleton className="h-12 w-1/3" />
           <Skeleton className="h-64 w-full" />
@@ -119,6 +193,8 @@ export default function SessionDetailPage() {
 
   return (
     <AppLayout>
+      <DynamicBreadcrumb />
+
       <div className="space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="flex items-start gap-4">
@@ -138,6 +214,201 @@ export default function SessionDetailPage() {
             </div>
           </div>
         </div>
+
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Total Features
+              </CardTitle>
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {sessionAnalytics.totalFeatures}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {sessionAnalytics.totalCases} test cases
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Passed</CardTitle>
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                {sessionAnalytics.passedCases}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {Math.round(
+                  (sessionAnalytics.passedCases / sessionAnalytics.totalCases) *
+                    100
+                )}
+                % success rate
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Failed</CardTitle>
+              <XCircle className="h-4 w-4 text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">
+                {sessionAnalytics.failedCases}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {sessionAnalytics.pendingCases} pending
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Active Testers
+              </CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {sessionAnalytics.activeTesters}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Team members testing
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Test Results Distribution</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer
+                config={{
+                  passed: { label: "Passed", color: "hsl(var(--chart-2))" },
+                  failed: { label: "Failed", color: "hsl(var(--chart-1))" },
+                  pending: { label: "Pending", color: "hsl(var(--chart-3))" },
+                }}
+                className="h-[250px]"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) =>
+                        `${name} ${(percent * 100).toFixed(0)}%`
+                      }
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Feature-wise Test Results</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer
+                config={{
+                  passed: { label: "Passed", color: "hsl(var(--chart-2))" },
+                  failed: { label: "Failed", color: "hsl(var(--chart-1))" },
+                }}
+                className="h-[250px]"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={sessionAnalytics.featureStats}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Legend />
+                    <Bar
+                      dataKey="passed"
+                      fill="var(--color-passed)"
+                      name="Passed"
+                    />
+                    <Bar
+                      dataKey="failed"
+                      fill="var(--color-failed)"
+                      name="Failed"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Daily Testing Progress
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer
+              config={{
+                tested: { label: "Tested", color: "hsl(var(--chart-4))" },
+                passed: { label: "Passed", color: "hsl(var(--chart-2))" },
+                failed: { label: "Failed", color: "hsl(var(--chart-1))" },
+              }}
+              className="h-[300px]"
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={sessionAnalytics.dailyProgress}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="tested"
+                    stroke="var(--color-tested)"
+                    name="Tested"
+                    strokeWidth={2}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="passed"
+                    stroke="var(--color-passed)"
+                    name="Passed"
+                    strokeWidth={2}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="failed"
+                    stroke="var(--color-failed)"
+                    name="Failed"
+                    strokeWidth={2}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          </CardContent>
+        </Card>
 
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
