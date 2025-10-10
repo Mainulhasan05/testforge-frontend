@@ -32,9 +32,9 @@ export default function InvitationsPage() {
     dispatch(fetchInvitations());
   }, [dispatch]);
 
-  const handleAccept = async (invitationId) => {
+  const handleAccept = async (token) => {
     try {
-      await dispatch(acceptInvitation(invitationId)).unwrap();
+      await dispatch(acceptInvitation(token)).unwrap();
       // Refresh invitations list
       dispatch(fetchInvitations());
     } catch (err) {
@@ -108,7 +108,7 @@ export default function InvitationsPage() {
         ) : (
           <div className="space-y-4">
             {invitations.map((invitation) => (
-              <Card key={invitation.id}>
+              <Card key={invitation._id}>
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-3">
@@ -154,7 +154,7 @@ export default function InvitationsPage() {
                         </Button>
                         <Button
                           size="sm"
-                          onClick={() => handleAccept(invitation.id)}
+                          onClick={() => handleAccept(invitation.token)}
                           className="gap-2"
                         >
                           <Check className="h-4 w-4" />
