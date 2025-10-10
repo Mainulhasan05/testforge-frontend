@@ -50,7 +50,6 @@ export default function MembersList({ orgId, members }) {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
-    name: "",
     role: "member",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -70,7 +69,7 @@ export default function MembersList({ orgId, members }) {
     try {
       await dispatch(inviteMember({ orgId, data: formData })).unwrap();
       setIsInviteOpen(false);
-      setFormData({ email: "", name: "", role: "member" });
+      setFormData({ email: "", role: "member" });
     } catch (err) {
       console.error("[v0] Failed to invite member:", err);
       alert(err.message || "Failed to invite member");
@@ -127,17 +126,7 @@ export default function MembersList({ orgId, members }) {
                       required
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Name (optional)</Label>
-                    <Input
-                      id="name"
-                      placeholder="John Doe"
-                      value={formData.name}
-                      onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
-                      }
-                    />
-                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="role">Role</Label>
                     <Select

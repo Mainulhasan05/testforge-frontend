@@ -122,10 +122,11 @@ export default function ForgotPasswordPage() {
               />
             </div>
           </CardContent>
-          <CardFooter className="flex flex-col gap-4">
+          <br />
+          <CardFooter className="flex flex-col gap-4 ">
             <Button
               type="submit"
-              className="w-full"
+              className="w-full "
               disabled={status === "loading"}
             >
               {status === "loading" ? "Sending..." : "Send reset link"}

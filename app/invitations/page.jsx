@@ -24,11 +24,9 @@ import AppLayout from "@/components/layout/app-layout";
 
 export default function InvitationsPage() {
   const dispatch = useDispatch();
-  const {
-    items: invitations,
-    status,
-    error,
-  } = useSelector((state) => state.invitations);
+  const { invitations, status, error } = useSelector(
+    (state) => state.invitations
+  );
 
   useEffect(() => {
     dispatch(fetchInvitations());
@@ -119,12 +117,12 @@ export default function InvitationsPage() {
                       </div>
                       <div>
                         <CardTitle className="text-xl">
-                          {invitation.org?.name || "Organization"}
+                          {invitation.orgId?.name || "Organization"}
                         </CardTitle>
                         <CardDescription className="mt-1">
                           Invited by{" "}
-                          {invitation.inviter?.name ||
-                            invitation.inviter?.email}{" "}
+                          {invitation.invitedBy?.name ||
+                            invitation.invitedBy?.email}{" "}
                           •{" "}
                           {formatDistanceToNow(new Date(invitation.createdAt), {
                             addSuffix: true,

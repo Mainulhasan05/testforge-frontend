@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Building2, LogOut, User, Menu } from "lucide-react";
+import { Building2, LogOut, User, Menu, PartyPopper } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import Cookie from "js-cookie";
@@ -49,6 +49,8 @@ export default function AppLayout({ children }) {
 
   const navigation = [
     { name: "Organizations", href: "/orgs", icon: Building2 },
+    // invitations
+    { name: "Invitations", href: "/invitations", icon: PartyPopper },
   ];
 
   return (
