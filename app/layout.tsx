@@ -5,6 +5,7 @@ import { GeistMono } from "geist/font/mono"
 import "./globals.css"
 import StoreProvider from "@/lib/StoreProvider"
 import { Suspense } from "react"
+import toast, { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
   title: "Test Session Platform",
@@ -20,6 +21,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
+      <Toaster />
         <Suspense fallback={<div>Loading...</div>}>
           <StoreProvider>{children}</StoreProvider>
         </Suspense>
