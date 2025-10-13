@@ -87,7 +87,9 @@ export default function SessionDetailPage() {
     const fetchStats = async () => {
       if (sessionId) {
         try {
-          const response = await realApi.sessions.getFeatureStatistics(sessionId);
+          const response = await realApi.sessions.getFeatureStatistics(
+            sessionId
+          );
           setFeatureStats(response.data);
         } catch (error) {
           console.error("Failed to fetch feature statistics:", error);
@@ -101,33 +103,48 @@ export default function SessionDetailPage() {
   }, [sessionId]);
 
   // Calculate session analytics from real data
-  const sessionAnalytics = featureStats ? {
-    totalFeatures: featureStats.summary.totalFeatures,
-    totalCases: featureStats.summary.totalCases,
-    passedCases: featureStats.features.reduce((sum, f) => sum + f.passedCases, 0),
-    failedCases: featureStats.features.reduce((sum, f) => sum + f.failedCases, 0),
-    pendingCases: featureStats.features.reduce((sum, f) => sum + f.untestedCases, 0),
-    activeTesters: new Set(featureStats.features.flatMap(f => f.testerStats.map(t => t.id))).size,
-    completionRate: Math.round(
-      (featureStats.features.reduce((sum, f) => sum + f.testedCases, 0) /
-       featureStats.summary.totalCases) * 100
-    ) || 0,
-    featureStats: featureStats.features.map(f => ({
-      name: f.title.substring(0, 15) + (f.title.length > 15 ? '...' : ''),
-      total: f.totalCases,
-      passed: f.passedCases,
-      failed: f.failedCases,
-    })),
-  } : {
-    totalFeatures: 0,
-    totalCases: 0,
-    passedCases: 0,
-    failedCases: 0,
-    pendingCases: 0,
-    activeTesters: 0,
-    completionRate: 0,
-    featureStats: [],
-  };
+  const sessionAnalytics = featureStats
+    ? {
+        totalFeatures: featureStats.summary.totalFeatures,
+        totalCases: featureStats.summary.totalCases,
+        passedCases: featureStats.features.reduce(
+          (sum, f) => sum + f.passedCases,
+          0
+        ),
+        failedCases: featureStats.features.reduce(
+          (sum, f) => sum + f.failedCases,
+          0
+        ),
+        pendingCases: featureStats.features.reduce(
+          (sum, f) => sum + f.untestedCases,
+          0
+        ),
+        activeTesters: new Set(
+          featureStats.features.flatMap((f) => f.testerStats.map((t) => t.id))
+        ).size,
+        completionRate:
+          Math.round(
+            (featureStats.features.reduce((sum, f) => sum + f.testedCases, 0) /
+              featureStats.summary.totalCases) *
+              100
+          ) || 0,
+        featureStats: featureStats.features.map((f) => ({
+          name: f.title.substring(0, 15) + (f.title.length > 15 ? "..." : ""),
+          total: f.totalCases,
+          passed: f.passedCases,
+          failed: f.failedCases,
+        })),
+      }
+    : {
+        totalFeatures: 0,
+        totalCases: 0,
+        passedCases: 0,
+        failedCases: 0,
+        pendingCases: 0,
+        activeTesters: 0,
+        completionRate: 0,
+        featureStats: [],
+      };
 
   const pieData = [
     {
@@ -218,8 +235,7 @@ export default function SessionDetailPage() {
   };
 
   const unassignedMembers = members.filter(
-    (member) =>
-      !currentSession?.assignees?.some((a) => a._id === member._id)
+    (member) => !currentSession?.assignees?.some((a) => a._id === member._id)
   );
 
   if (!currentSession) {
@@ -530,11 +546,8 @@ export default function SessionDetailPage() {
                           </SelectTrigger>
                           <SelectContent>
                             {unassignedMembers.map((member) => (
-                              <SelectItem
-                                key={member._id}
-                                value={member._id}
-                              >
-                                {member.fullName || member.email}
+                              <SelectItem key={member._id} value={member._id}>
+                                {member.fullName} - {member.email}
                               </SelectItem>
                             ))}
                           </SelectContent>
