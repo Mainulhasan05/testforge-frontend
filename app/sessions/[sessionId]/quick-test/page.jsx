@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useDispatch } from "react-redux";
 import { useParams } from "next/navigation";
 import { createFeedback, updateFeedback } from "@/lib/slices/feedbackSlice";
@@ -23,7 +23,6 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import {
   Accordion,
@@ -67,19 +66,74 @@ export default function QuickTestPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [expandedFeatures, setExpandedFeatures] = useState([]);
 
-  const loadDashboard = async () => {
+  // Refs for scroll position preservation
+  const scrollPositionRef = useRef(0);
+  const containerRef = useRef(null);
+
+  // Save scroll position and expanded state to sessionStorage
+  const saveUIState = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      const state = {
+        scrollPosition: window.scrollY,
+        expandedFeatures,
+        statusFilter,
+      };
+      sessionStorage.setItem(`quickTest_${sessionId}`, JSON.stringify(state));
+    }
+  }, [sessionId, expandedFeatures, statusFilter]);
+
+  // Restore UI state after data loads
+  const restoreUIState = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      const savedState = sessionStorage.getItem(`quickTest_${sessionId}`);
+      if (savedState) {
+        try {
+          const state = JSON.parse(savedState);
+          if (state.expandedFeatures?.length > 0) {
+            setExpandedFeatures(state.expandedFeatures);
+          }
+          if (state.statusFilter) {
+            setStatusFilter(state.statusFilter);
+          }
+          // Restore scroll position after a brief delay to ensure content is rendered
+          setTimeout(() => {
+            window.scrollTo(0, state.scrollPosition || 0);
+          }, 100);
+        } catch (e) {
+          console.error("Failed to restore UI state:", e);
+        }
+      }
+    }
+  }, [sessionId]);
+
+  const loadDashboard = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
+
+      // Save current state before reloading
+      if (dashboardData) {
+        saveUIState();
+      }
+
       const response = await realApi.sessions.getDashboard(sessionId);
       setDashboardData(response.data);
-      if (response.data.features.length > 0) {
-        setExpandedFeatures([response.data.features[0]._id]);
+
+      // Only set default expanded state on first load
+      if (!dashboardData && response.data.features.length > 0) {
+        const savedState = sessionStorage.getItem(`quickTest_${sessionId}`);
+        if (!savedState) {
+          setExpandedFeatures([response.data.features[0]._id]);
+        }
       }
     } catch (error) {
       console.error("Failed to load dashboard:", error);
       toast.error("Failed to load session data");
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -88,6 +142,22 @@ export default function QuickTestPage() {
       loadDashboard();
     }
   }, [sessionId]);
+
+  // Restore UI state after dashboard data loads
+  useEffect(() => {
+    if (dashboardData && !loading) {
+      restoreUIState();
+    }
+  }, [dashboardData, loading, restoreUIState]);
+
+  // Save state before unmount
+  useEffect(() => {
+    return () => {
+      if (dashboardData) {
+        saveUIState();
+      }
+    };
+  }, [dashboardData, saveUIState]);
 
   const handleQuickFeedback = async (testCase, result) => {
     const userFeedback = testCase.userFeedback;
@@ -119,6 +189,35 @@ export default function QuickTestPage() {
 
   const submitFeedback = async (caseId, result, feedbackComment, isUpdate = false, feedbackId = null) => {
     setSubmittingFeedback((prev) => ({ ...prev, [caseId]: true }));
+
+    // Save current UI state
+    saveUIState();
+
+    // Optimistic update - update local state immediately
+    if (dashboardData) {
+      const updatedFeatures = dashboardData.features.map(feature => ({
+        ...feature,
+        cases: feature.cases.map(testCase => {
+          if (testCase._id === caseId) {
+            const updatedFeedback = isUpdate && testCase.userFeedback
+              ? { ...testCase.userFeedback, result, comment: feedbackComment || `Marked as ${result}` }
+              : { _id: feedbackId || 'temp', result, comment: feedbackComment || `Marked as ${result}`, testerId: {} };
+
+            return {
+              ...testCase,
+              userFeedback: updatedFeedback
+            };
+          }
+          return testCase;
+        })
+      }));
+
+      setDashboardData(prev => ({
+        ...prev,
+        features: updatedFeatures
+      }));
+    }
+
     try {
       if (isUpdate && feedbackId) {
         await dispatch(updateFeedback({
@@ -133,10 +232,15 @@ export default function QuickTestPage() {
         })).unwrap();
         toast.success(`Test case marked as ${result}`);
       }
-      await loadDashboard();
+
+      // Silent reload to update progress stats without losing position
+      await loadDashboard(true);
     } catch (error) {
       console.error("Failed to submit feedback:", error);
       toast.error(error.message || "Failed to submit feedback");
+
+      // Revert optimistic update on error
+      await loadDashboard(true);
     } finally {
       setSubmittingFeedback((prev) => ({ ...prev, [caseId]: false }));
     }
@@ -174,13 +278,15 @@ export default function QuickTestPage() {
     return cases.filter((c) => c.userFeedback?.result === statusFilter);
   };
 
-  if (loading) {
+  if (loading && !dashboardData) {
     return (
       <AppLayout>
         <DynamicBreadcrumb />
-        <div className="space-y-6">
-          <Skeleton className="h-12 w-1/3" />
-          <Skeleton className="h-64 w-full" />
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent mb-4"></div>
+            <p className="text-sm text-muted-foreground">Loading session data...</p>
+          </div>
         </div>
       </AppLayout>
     );
@@ -217,38 +323,38 @@ export default function QuickTestPage() {
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
+        <Card className="border-border/50 shadow-sm">
+          <CardHeader className="bg-muted/30">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Your Testing Progress</CardTitle>
+                <CardTitle className="text-foreground">Your Testing Progress</CardTitle>
                 <CardDescription>Click Pass/Fail to submit. Click again to update.</CardDescription>
               </div>
-              <Badge variant="outline" className="text-lg px-4 py-2">{stats.progressPercentage}% Complete</Badge>
+              <Badge variant="outline" className="text-lg px-4 py-2 bg-background">{stats.progressPercentage}% Complete</Badge>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <Progress value={stats.progressPercentage} className="h-2" />
+          <CardContent className="space-y-4 pt-6">
+            <Progress value={stats.progressPercentage} className="h-3" />
             <div className="grid grid-cols-3 gap-4">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200/50 dark:border-green-800/30">
+                <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-500" />
                 <div>
-                  <p className="text-2xl font-bold text-green-600">{stats.passedCases}</p>
-                  <p className="text-xs text-muted-foreground">Passed</p>
+                  <p className="text-2xl font-bold text-green-700 dark:text-green-400">{stats.passedCases}</p>
+                  <p className="text-xs text-green-600/70 dark:text-green-500/70">Passed</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <XCircle className="h-5 w-5 text-red-600" />
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200/50 dark:border-red-800/30">
+                <XCircle className="h-6 w-6 text-red-600 dark:text-red-500" />
                 <div>
-                  <p className="text-2xl font-bold text-red-600">{stats.failedCases}</p>
-                  <p className="text-xs text-muted-foreground">Failed</p>
+                  <p className="text-2xl font-bold text-red-700 dark:text-red-400">{stats.failedCases}</p>
+                  <p className="text-xs text-red-600/70 dark:text-red-500/70">Failed</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-gray-500" />
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-900/30 border border-slate-200/50 dark:border-slate-700/30">
+                <Clock className="h-6 w-6 text-slate-600 dark:text-slate-400" />
                 <div>
-                  <p className="text-2xl font-bold text-gray-600">{stats.untestedCases}</p>
-                  <p className="text-xs text-muted-foreground">Untested</p>
+                  <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{stats.untestedCases}</p>
+                  <p className="text-xs text-slate-600/70 dark:text-slate-400/70">Untested</p>
                 </div>
               </div>
             </div>
@@ -293,12 +399,12 @@ export default function QuickTestPage() {
             {features.map((feature) => {
               const filteredCases = getFilteredCases(feature.cases);
               return (
-                <AccordionItem key={feature._id} value={feature._id} className="border rounded-lg">
-                  <AccordionTrigger className="px-6 hover:no-underline">
+                <AccordionItem key={feature._id} value={feature._id} className="border border-border/50 rounded-lg shadow-sm bg-card">
+                  <AccordionTrigger className="px-6 hover:no-underline hover:bg-muted/30 transition-colors rounded-t-lg">
                     <div className="flex items-center justify-between w-full pr-4">
                       <div className="flex items-center gap-3">
-                        <h3 className="text-lg font-semibold">{feature.title}</h3>
-                        <Badge variant="outline">{feature.stats.tested}/{feature.stats.total} tested</Badge>
+                        <h3 className="text-lg font-semibold text-foreground">{feature.title}</h3>
+                        <Badge variant="outline" className="bg-background">{feature.stats.tested}/{feature.stats.total} tested</Badge>
                       </div>
                       {feature.description && <p className="text-sm text-muted-foreground max-w-md truncate">{feature.description}</p>}
                     </div>
@@ -313,35 +419,40 @@ export default function QuickTestPage() {
                         {filteredCases.map((testCase) => {
                           const myFeedback = testCase.userFeedback;
                           const isTested = !!myFeedback;
+                          const borderColor = myFeedback
+                            ? (myFeedback.result === "pass"
+                              ? "rgb(34 197 94 / 0.5)"
+                              : "rgb(239 68 68 / 0.5)")
+                            : "rgb(148 163 184 / 0.3)";
                           return (
-                            <Card key={testCase._id} className="border-l-4" style={{
-                              borderLeftColor: myFeedback ? (myFeedback.result === "pass" ? "hsl(var(--chart-2))" : "hsl(var(--chart-1))") : "hsl(var(--border))",
+                            <Card key={testCase._id} className="border-l-4 border-border/40 shadow-sm hover:shadow-md transition-shadow" style={{
+                              borderLeftColor: borderColor,
                             }}>
-                              <CardContent className="pt-4">
+                              <CardContent className="pt-4 pb-4">
                                 <div className="flex items-start justify-between gap-4">
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-2">
-                                      <h4 className="font-medium">{testCase.title}</h4>
+                                      <h4 className="font-medium text-foreground">{testCase.title}</h4>
                                       {isTested && <Badge variant={getStatusColor(myFeedback.result)} className="flex items-center gap-1">
                                         {getStatusIcon(myFeedback.result)}{myFeedback.result}
                                       </Badge>}
                                     </div>
                                     {testCase.note && <p className="text-sm text-muted-foreground mb-1"><span className="font-medium">Steps:</span> {testCase.note}</p>}
                                     {testCase.expectedOutput && <p className="text-sm text-muted-foreground mb-1"><span className="font-medium">Expected:</span> {testCase.expectedOutput}</p>}
-                                    {isTested && myFeedback.comment && <p className="text-sm text-muted-foreground mt-2 p-2 bg-muted rounded"><span className="font-medium">Your comment:</span> {myFeedback.comment}</p>}
+                                    {isTested && myFeedback.comment && <p className="text-sm text-foreground/80 mt-3 p-3 bg-muted/50 rounded-md border border-border/30"><span className="font-medium">Your comment:</span> {myFeedback.comment}</p>}
                                   </div>
                                   <div className="flex flex-col gap-2 flex-shrink-0">
                                     <Button size="sm" variant={myFeedback?.result === "pass" ? "default" : "outline"}
-                                      className={myFeedback?.result === "pass" ? "" : "border-green-600 text-green-600 hover:bg-green-50 hover:text-green-700"}
+                                      className={myFeedback?.result === "pass" ? "bg-green-600 hover:bg-green-700 border-0" : "border-green-500/50 text-green-700 dark:text-green-500 hover:bg-green-50 dark:hover:bg-green-950/30 hover:border-green-600"}
                                       onClick={() => handleQuickFeedback(testCase, "pass")} disabled={submittingFeedback[testCase._id]}>
                                       <CheckCircle2 className="mr-2 h-4 w-4" />{myFeedback?.result === "pass" ? "Passed" : "Pass"}
                                     </Button>
                                     <Button size="sm" variant={myFeedback?.result === "fail" ? "destructive" : "outline"}
-                                      className={myFeedback?.result === "fail" ? "" : "border-red-600 text-red-600 hover:bg-red-50 hover:text-red-700"}
+                                      className={myFeedback?.result === "fail" ? "" : "border-red-500/50 text-red-700 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 hover:border-red-600"}
                                       onClick={() => handleQuickFeedback(testCase, "fail")} disabled={submittingFeedback[testCase._id]}>
                                       <XCircle className="mr-2 h-4 w-4" />{myFeedback?.result === "fail" ? "Failed" : "Fail"}
                                     </Button>
-                                    {isTested && <Button size="sm" variant="ghost" onClick={() => {
+                                    {isTested && <Button size="sm" variant="ghost" className="hover:bg-muted/50" onClick={() => {
                                       setPendingFeedback({ caseId: testCase._id, feedbackId: myFeedback._id, isUpdate: true });
                                       setSelectedResult(myFeedback.result);
                                       setComment(myFeedback.comment || "");
