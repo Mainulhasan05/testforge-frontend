@@ -44,7 +44,9 @@ import {
   CheckCircle2,
   XCircle,
   TrendingUp,
+  Zap,
 } from "lucide-react";
+import Link from "next/link";
 import {
   Bar,
   BarChart,
@@ -212,6 +214,14 @@ export default function SessionDetailPage() {
                 {currentSession.description || "No description"}
               </p>
             </div>
+          </div>
+          <div className="flex gap-2">
+            <Link href={`/sessions/${sessionId}/quick-test`}>
+              <Button className="gap-2">
+                <Zap className="h-4 w-4" />
+                Quick Test Mode
+              </Button>
+            </Link>
           </div>
         </div>
 
