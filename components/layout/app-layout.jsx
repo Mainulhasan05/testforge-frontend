@@ -5,6 +5,7 @@ import { logout } from "@/lib/slices/authSlice";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -18,6 +19,7 @@ import { Building2, LogOut, User, Menu, PartyPopper } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import Cookie from "js-cookie";
+import { realApi } from "@/lib/realApi";
 
 export default function AppLayout({ children }) {
   const { user } = useSelector((state) => state.auth);
