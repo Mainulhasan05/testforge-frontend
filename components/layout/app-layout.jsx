@@ -31,7 +31,7 @@ export default function AppLayout({ children }) {
 
   useEffect(() => setMounted(true), []);
 
-  // Fetch invitation count
+  // Fetch invitation count only on initial load
   useEffect(() => {
     const fetchInvitationCount = async () => {
       if (user) {
@@ -45,9 +45,6 @@ export default function AppLayout({ children }) {
     };
 
     fetchInvitationCount();
-    // Refresh count every 30 seconds
-    const interval = setInterval(fetchInvitationCount, 30000);
-    return () => clearInterval(interval);
   }, [user]);
 
   const handleLogout = async () => {

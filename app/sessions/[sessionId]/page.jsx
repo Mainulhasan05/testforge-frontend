@@ -9,6 +9,7 @@ import {
   unassignUserFromSession,
 } from "@/lib/slices/sessionsSlice";
 import { fetchOrgMembers } from "@/lib/slices/orgsSlice";
+import { createFeature, fetchFeatures } from "@/lib/slices/featuresSlice";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -46,6 +49,7 @@ import {
   TrendingUp,
   Zap,
   Copy,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { realApi } from "@/lib/realApi";
@@ -81,6 +85,8 @@ export default function SessionDetailPage() {
   const [duplicating, setDuplicating] = useState(false);
   const [featureStats, setFeatureStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
+  const [isCreateFeatureOpen, setIsCreateFeatureOpen] = useState(false);
+  const [featureFormData, setFeatureFormData] = useState({ title: "", description: "" });
 
   // Fetch real feature statistics
   useEffect(() => {
@@ -212,6 +218,20 @@ export default function SessionDetailPage() {
     }
   };
 
+  const handleCreateFeature = async (e) => {
+    e.preventDefault();
+    try {
+      await dispatch(createFeature({ sessionId, data: featureFormData })).unwrap();
+      setIsCreateFeatureOpen(false);
+      setFeatureFormData({ title: "", description: "" });
+      dispatch(fetchFeatures({ sessionId, params: { page: 1, limit: 10 } }));
+      toast.success("Feature created successfully");
+    } catch (err) {
+      console.error("Failed to create feature:", err);
+      toast.error("Failed to create feature");
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case "active":
@@ -272,7 +292,61 @@ export default function SessionDetailPage() {
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <Dialog open={isCreateFeatureOpen} onOpenChange={setIsCreateFeatureOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Feature
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <form onSubmit={handleCreateFeature}>
+                  <DialogHeader>
+                    <DialogTitle>Create Feature</DialogTitle>
+                    <DialogDescription>
+                      Add a new feature to test in this session
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="feature-title">Feature Title</Label>
+                      <Input
+                        id="feature-title"
+                        placeholder="User Authentication"
+                        value={featureFormData.title}
+                        onChange={(e) =>
+                          setFeatureFormData({ ...featureFormData, title: e.target.value })
+                        }
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="feature-description">Description</Label>
+                      <Textarea
+                        id="feature-description"
+                        placeholder="Describe what this feature does"
+                        value={featureFormData.description}
+                        onChange={(e) =>
+                          setFeatureFormData({ ...featureFormData, description: e.target.value })
+                        }
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsCreateFeatureOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit">Create Feature</Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
             <Button
               variant="outline"
               className="gap-2"
@@ -367,36 +441,38 @@ export default function SessionDetailPage() {
               <CardTitle>Test Results Distribution</CardTitle>
             </CardHeader>
             <CardContent>
-              <ChartContainer
-                config={{
-                  passed: { label: "Passed", color: "hsl(var(--chart-2))" },
-                  failed: { label: "Failed", color: "hsl(var(--chart-1))" },
-                  pending: { label: "Pending", color: "hsl(var(--chart-3))" },
-                }}
-                className="h-[250px]"
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) =>
-                        `${name} ${(percent * 100).toFixed(0)}%`
-                      }
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {pieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </ChartContainer>
+              <div className="overflow-x-auto">
+                <ChartContainer
+                  config={{
+                    passed: { label: "Passed", color: "hsl(var(--chart-2))" },
+                    failed: { label: "Failed", color: "hsl(var(--chart-1))" },
+                    pending: { label: "Pending", color: "hsl(var(--chart-3))" },
+                  }}
+                  className="h-[250px]"
+                >
+                  <ResponsiveContainer width="100%" height="100%" minWidth={300}>
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) =>
+                          `${name} ${(percent * 100).toFixed(0)}%`
+                        }
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              </div>
             </CardContent>
           </Card>
 
@@ -405,33 +481,35 @@ export default function SessionDetailPage() {
               <CardTitle>Feature-wise Test Results</CardTitle>
             </CardHeader>
             <CardContent>
-              <ChartContainer
-                config={{
-                  passed: { label: "Passed", color: "hsl(var(--chart-2))" },
-                  failed: { label: "Failed", color: "hsl(var(--chart-1))" },
-                }}
-                className="h-[250px]"
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={sessionAnalytics.featureStats}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Legend />
-                    <Bar
-                      dataKey="passed"
-                      fill="var(--color-passed)"
-                      name="Passed"
-                    />
-                    <Bar
-                      dataKey="failed"
-                      fill="var(--color-failed)"
-                      name="Failed"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartContainer>
+              <div className="overflow-x-auto">
+                <ChartContainer
+                  config={{
+                    passed: { label: "Passed", color: "hsl(var(--chart-2))" },
+                    failed: { label: "Failed", color: "hsl(var(--chart-1))" },
+                  }}
+                  className="h-[250px]"
+                >
+                  <ResponsiveContainer width="100%" height="100%" minWidth={400}>
+                    <BarChart data={sessionAnalytics.featureStats}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Legend />
+                      <Bar
+                        dataKey="passed"
+                        fill="var(--color-passed)"
+                        name="Passed"
+                      />
+                      <Bar
+                        dataKey="failed"
+                        fill="var(--color-failed)"
+                        name="Failed"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              </div>
             </CardContent>
           </Card>
         </div>

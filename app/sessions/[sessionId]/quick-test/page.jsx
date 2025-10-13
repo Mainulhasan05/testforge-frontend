@@ -401,12 +401,12 @@ export default function QuickTestPage() {
               return (
                 <AccordionItem key={feature._id} value={feature._id} className="border border-border/50 rounded-lg shadow-sm bg-card">
                   <AccordionTrigger className="px-6 hover:no-underline hover:bg-muted/30 transition-colors rounded-t-lg">
-                    <div className="flex items-center justify-between w-full pr-4">
-                      <div className="flex items-center gap-3">
-                        <h3 className="text-lg font-semibold text-foreground">{feature.title}</h3>
-                        <Badge variant="outline" className="bg-background">{feature.stats.tested}/{feature.stats.total} tested</Badge>
+                    <div className="flex items-center justify-between w-full pr-4 flex-wrap gap-2">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <h3 className="text-lg font-semibold text-foreground break-words">{feature.title}</h3>
+                        <Badge variant="outline" className="bg-background flex-shrink-0">{feature.stats.tested}/{feature.stats.total} tested</Badge>
                       </div>
-                      {feature.description && <p className="text-sm text-muted-foreground max-w-md truncate">{feature.description}</p>}
+                      {feature.description && <p className="text-sm text-muted-foreground max-w-md truncate break-words overflow-hidden">{feature.description}</p>}
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="px-6 pb-4">
@@ -430,16 +430,16 @@ export default function QuickTestPage() {
                             }}>
                               <CardContent className="pt-4 pb-4">
                                 <div className="flex items-start justify-between gap-4">
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <h4 className="font-medium text-foreground">{testCase.title}</h4>
-                                      {isTested && <Badge variant={getStatusColor(myFeedback.result)} className="flex items-center gap-1">
+                                  <div className="flex-1 min-w-0 break-words overflow-hidden">
+                                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                      <h4 className="font-medium text-foreground break-words">{testCase.title}</h4>
+                                      {isTested && <Badge variant={getStatusColor(myFeedback.result)} className="flex items-center gap-1 flex-shrink-0">
                                         {getStatusIcon(myFeedback.result)}{myFeedback.result}
                                       </Badge>}
                                     </div>
-                                    {testCase.note && <p className="text-sm text-muted-foreground mb-1"><span className="font-medium">Steps:</span> {testCase.note}</p>}
-                                    {testCase.expectedOutput && <p className="text-sm text-muted-foreground mb-1"><span className="font-medium">Expected:</span> {testCase.expectedOutput}</p>}
-                                    {isTested && myFeedback.comment && <p className="text-sm text-foreground/80 mt-3 p-3 bg-muted/50 rounded-md border border-border/30"><span className="font-medium">Your comment:</span> {myFeedback.comment}</p>}
+                                    {testCase.note && <p className="text-sm text-muted-foreground mb-1 break-words"><span className="font-medium">Steps:</span> {testCase.note}</p>}
+                                    {testCase.expectedOutput && <p className="text-sm text-muted-foreground mb-1 break-words"><span className="font-medium">Expected:</span> {testCase.expectedOutput}</p>}
+                                    {isTested && myFeedback.comment && <p className="text-sm text-foreground/80 mt-3 p-3 bg-muted/50 rounded-md border border-border/30 break-words"><span className="font-medium">Your comment:</span> {myFeedback.comment}</p>}
                                   </div>
                                   <div className="flex flex-col gap-2 flex-shrink-0">
                                     <Button size="sm" variant={myFeedback?.result === "pass" ? "default" : "outline"}

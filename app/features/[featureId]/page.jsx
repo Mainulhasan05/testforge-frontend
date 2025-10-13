@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { fetchFeatureById } from "@/lib/slices/featuresSlice";
 import { fetchCases, createCase } from "@/lib/slices/casesSlice";
 import { fetchFeedback, createFeedback } from "@/lib/slices/feedbackSlice";
+import { realApi } from "@/lib/realApi";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,6 +50,7 @@ import {
   BarChart3,
   TrendingUp,
   Users,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
@@ -98,6 +100,8 @@ export default function FeatureDetailPage() {
   const [historyModalOpen, setHistoryModalOpen] = useState(null);
   const [feedbackForm, setFeedbackForm] = useState({ result: "", comment: "" });
   const [historyPage, setHistoryPage] = useState(1);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const featureAnalytics = {
     totalCases: cases.length || 12,
@@ -222,6 +226,30 @@ export default function FeatureDetailPage() {
       );
     } catch (err) {
       console.error("[v0] Failed to submit feedback:", err);
+    }
+  };
+
+  const handleDeleteCase = async () => {
+    if (!deleteModalOpen) return;
+
+    setIsDeleting(true);
+    try {
+      await realApi.cases.delete(deleteModalOpen);
+      setDeleteModalOpen(null);
+      dispatch(
+        fetchCases({
+          featureId,
+          params: {
+            page,
+            limit: 10,
+            status: statusFilter !== "all" ? statusFilter : "",
+          },
+        })
+      );
+    } catch (err) {
+      console.error("[v0] Failed to delete case:", err);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -582,7 +610,7 @@ export default function FeatureDetailPage() {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
                         <Button
                           variant="outline"
                           size="sm"
@@ -601,6 +629,15 @@ export default function FeatureDetailPage() {
                         >
                           <History className="mr-2 h-4 w-4" />
                           View History
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setDeleteModalOpen(testCase._id)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
                         </Button>
                       </div>
                     </CardContent>
@@ -782,6 +819,38 @@ export default function FeatureDetailPage() {
               </>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!deleteModalOpen}
+        onOpenChange={(open) => !open && setDeleteModalOpen(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Test Case</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this test case? This will permanently delete the test case and all related feedback and progress data. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteModalOpen(null)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteCase}
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </AppLayout>
