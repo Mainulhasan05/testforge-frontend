@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { login, clearError } from "@/lib/slices/authSlice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get("redirect");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const dispatch = useDispatch();
@@ -27,9 +30,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (user) {
-      router.push("/orgs");
+      router.push(redirect || "/orgs");
     }
-  }, [user, router]);
+  }, [user, router, redirect]);
 
   useEffect(() => {
     return () => {
@@ -41,7 +44,7 @@ export default function LoginPage() {
     e.preventDefault();
     try {
       await dispatch(login({ email, password })).unwrap();
-      router.push("/orgs");
+      router.push(redirect || "/orgs");
     } catch (err) {
       console.error("[v0] Login failed:", err);
     }

@@ -45,7 +45,10 @@ import {
   XCircle,
   TrendingUp,
   Zap,
+  Copy,
 } from "lucide-react";
+import { toast } from "sonner";
+import { realApi } from "@/lib/realApi";
 import Link from "next/link";
 import {
   Bar,
@@ -75,31 +78,55 @@ export default function SessionDetailPage() {
   const { members } = useSelector((state) => state.orgs);
   const [isAssignOpen, setIsAssignOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("");
+  const [duplicating, setDuplicating] = useState(false);
+  const [featureStats, setFeatureStats] = useState(null);
+  const [loadingStats, setLoadingStats] = useState(true);
 
-  const sessionAnalytics = {
-    totalFeatures: 8,
-    totalCases: 45,
-    passedCases: 32,
-    failedCases: 8,
-    pendingCases: 5,
-    activeTesters: 6,
-    completionRate: 71,
-    // Feature-wise breakdown
-    featureStats: [
-      { name: "Login", total: 8, passed: 7, failed: 1 },
-      { name: "Dashboard", total: 12, passed: 10, failed: 2 },
-      { name: "Profile", total: 6, passed: 5, failed: 1 },
-      { name: "Settings", total: 9, passed: 6, failed: 2 },
-      { name: "Reports", total: 10, passed: 4, failed: 4 },
-    ],
-    // Daily progress
-    dailyProgress: [
-      { date: "Mon", tested: 5, passed: 4, failed: 1 },
-      { date: "Tue", tested: 8, passed: 6, failed: 2 },
-      { date: "Wed", tested: 12, passed: 10, failed: 2 },
-      { date: "Thu", tested: 10, passed: 7, failed: 3 },
-      { date: "Fri", tested: 10, passed: 5, failed: 0 },
-    ],
+  // Fetch real feature statistics
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (sessionId) {
+        try {
+          const response = await realApi.sessions.getFeatureStatistics(sessionId);
+          setFeatureStats(response.data);
+        } catch (error) {
+          console.error("Failed to fetch feature statistics:", error);
+        } finally {
+          setLoadingStats(false);
+        }
+      }
+    };
+
+    fetchStats();
+  }, [sessionId]);
+
+  // Calculate session analytics from real data
+  const sessionAnalytics = featureStats ? {
+    totalFeatures: featureStats.summary.totalFeatures,
+    totalCases: featureStats.summary.totalCases,
+    passedCases: featureStats.features.reduce((sum, f) => sum + f.passedCases, 0),
+    failedCases: featureStats.features.reduce((sum, f) => sum + f.failedCases, 0),
+    pendingCases: featureStats.features.reduce((sum, f) => sum + f.untestedCases, 0),
+    activeTesters: new Set(featureStats.features.flatMap(f => f.testerStats.map(t => t.id))).size,
+    completionRate: Math.round(
+      (featureStats.features.reduce((sum, f) => sum + f.testedCases, 0) /
+       featureStats.summary.totalCases) * 100
+    ) || 0,
+    featureStats: featureStats.features.map(f => ({
+      name: f.title.substring(0, 15) + (f.title.length > 15 ? '...' : ''),
+      total: f.totalCases,
+      passed: f.passedCases,
+      failed: f.failedCases,
+    })),
+  } : {
+    totalFeatures: 0,
+    totalCases: 0,
+    passedCases: 0,
+    failedCases: 0,
+    pendingCases: 0,
+    activeTesters: 0,
+    completionRate: 0,
+    featureStats: [],
   };
 
   const pieData = [
@@ -154,6 +181,20 @@ export default function SessionDetailPage() {
     }
   };
 
+  const handleDuplicate = async () => {
+    setDuplicating(true);
+    try {
+      const response = await realApi.sessions.duplicate(sessionId);
+      toast.success(`Session duplicated successfully: ${response.data.title}`);
+      // Optionally redirect to the new session
+      window.location.href = `/sessions/${response.data._id}`;
+    } catch (error) {
+      toast.error(error.message || "Failed to duplicate session");
+    } finally {
+      setDuplicating(false);
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case "active":
@@ -178,7 +219,7 @@ export default function SessionDetailPage() {
 
   const unassignedMembers = members.filter(
     (member) =>
-      !currentSession?.assignees?.some((a) => a.userId === member.userId)
+      !currentSession?.assignees?.some((a) => a._id === member._id)
   );
 
   if (!currentSession) {
@@ -216,6 +257,15 @@ export default function SessionDetailPage() {
             </div>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={handleDuplicate}
+              disabled={duplicating}
+            >
+              <Copy className="h-4 w-4" />
+              {duplicating ? "Duplicating..." : "Duplicate Session"}
+            </Button>
             <Link href={`/sessions/${sessionId}/quick-test`}>
               <Button className="gap-2">
                 <Zap className="h-4 w-4" />
@@ -481,10 +531,10 @@ export default function SessionDetailPage() {
                           <SelectContent>
                             {unassignedMembers.map((member) => (
                               <SelectItem
-                                key={member.userId}
-                                value={member.userId}
+                                key={member._id}
+                                value={member._id}
                               >
-                                {member.user?.name || member.user?.email}
+                                {member.fullName || member.email}
                               </SelectItem>
                             ))}
                           </SelectContent>

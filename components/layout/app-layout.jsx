@@ -27,7 +27,28 @@ export default function AppLayout({ children }) {
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [invitationCount, setInvitationCount] = useState(0);
+
   useEffect(() => setMounted(true), []);
+
+  // Fetch invitation count
+  useEffect(() => {
+    const fetchInvitationCount = async () => {
+      if (user) {
+        try {
+          const response = await realApi.invitations.getCount();
+          setInvitationCount(response.data.count || 0);
+        } catch (error) {
+          console.error("Failed to fetch invitation count:", error);
+        }
+      }
+    };
+
+    fetchInvitationCount();
+    // Refresh count every 30 seconds
+    const interval = setInterval(fetchInvitationCount, 30000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   const handleLogout = async () => {
     localStorage.removeItem("authToken");
@@ -76,9 +97,14 @@ export default function AppLayout({ children }) {
                 <Link
                   key={item.name}
                   href={item.href}
-                  className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground relative inline-flex items-center gap-2"
                 >
                   {item.name}
+                  {item.name === "Invitations" && invitationCount > 0 && (
+                    <Badge variant="destructive" className="h-5 min-w-5 px-1 text-xs">
+                      {invitationCount}
+                    </Badge>
+                  )}
                 </Link>
               ))}
             </nav>
@@ -103,6 +129,11 @@ export default function AppLayout({ children }) {
                     >
                       <item.icon className="h-5 w-5" />
                       {item.name}
+                      {item.name === "Invitations" && invitationCount > 0 && (
+                        <Badge variant="destructive" className="h-5 min-w-5 px-1 text-xs ml-auto">
+                          {invitationCount}
+                        </Badge>
+                      )}
                     </Link>
                   ))}
                 </nav>

@@ -16,6 +16,7 @@ export function middleware(request) {
     "/signup",
     "/forgot-password",
     "/reset-password",
+    "/accept-invitation",
   ];
   const isPublicPath = publicPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)

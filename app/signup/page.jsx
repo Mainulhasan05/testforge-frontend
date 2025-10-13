@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signup, clearError } from "@/lib/slices/authSlice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,16 +17,45 @@ import {
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
+import { realApi } from "@/lib/realApi";
+import { toast } from "sonner";
 
 export default function SignupPage() {
+  const searchParams = useSearchParams();
+  const invitationToken = searchParams.get("token");
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [validationError, setValidationError] = useState("");
+  const [invitationInfo, setInvitationInfo] = useState(null);
+  const [loadingInvitation, setLoadingInvitation] = useState(false);
+
   const dispatch = useDispatch();
   const router = useRouter();
   const { status, error, user } = useSelector((state) => state.auth);
+
+  // Verify invitation token if present
+  useEffect(() => {
+    const verifyInvitation = async () => {
+      if (invitationToken) {
+        setLoadingInvitation(true);
+        try {
+          const response = await realApi.invitations.verify(invitationToken);
+          setInvitationInfo(response.data);
+          setEmail(response.data.email || "");
+        } catch (error) {
+          toast.error("Invalid or expired invitation link");
+          setValidationError("Invalid or expired invitation link");
+        } finally {
+          setLoadingInvitation(false);
+        }
+      }
+    };
+
+    verifyInvitation();
+  }, [invitationToken]);
 
   useEffect(() => {
     if (user) {
@@ -56,7 +85,19 @@ export default function SignupPage() {
     }
 
     try {
-      await dispatch(signup({ fullName: name, email, password })).unwrap();
+      const signupData = { fullName: name, email, password };
+
+      // Add invitation token if present
+      if (invitationToken) {
+        signupData.invitationToken = invitationToken;
+      }
+
+      await dispatch(signup(signupData)).unwrap();
+
+      if (invitationToken && invitationInfo) {
+        toast.success(`Welcome! You've joined ${invitationInfo.organizationName}`);
+      }
+
       router.push("/orgs");
     } catch (err) {
       console.error("[v0] Signup failed:", err);
@@ -71,11 +112,25 @@ export default function SignupPage() {
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
           <CardDescription>
-            Enter your information to create a new account
+            {invitationInfo
+              ? `Join ${invitationInfo.organizationName} as ${invitationInfo.role}`
+              : "Enter your information to create a new account"}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
+            {loadingInvitation && (
+              <Alert>
+                <AlertDescription>Verifying invitation...</AlertDescription>
+              </Alert>
+            )}
+            {invitationInfo && (
+              <Alert className="border-green-500 bg-green-50 dark:bg-green-950/20">
+                <AlertDescription className="text-green-800 dark:text-green-400">
+                  You're invited to join <strong>{invitationInfo.organizationName}</strong> as a {invitationInfo.role}
+                </AlertDescription>
+              </Alert>
+            )}
             {displayError && (
               <Alert variant="destructive">
                 <AlertDescription>{displayError}</AlertDescription>
@@ -101,6 +156,7 @@ export default function SignupPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={!!invitationInfo}
               />
             </div>
             <div className="space-y-2">
