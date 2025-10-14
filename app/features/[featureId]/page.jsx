@@ -7,6 +7,7 @@ import { fetchFeatureById } from "@/lib/slices/featuresSlice";
 import { fetchCases, createCase } from "@/lib/slices/casesSlice";
 import { fetchFeedback, createFeedback } from "@/lib/slices/feedbackSlice";
 import { realApi } from "@/lib/realApi";
+import toast from "react-hot-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,6 +52,9 @@ import {
   TrendingUp,
   Users,
   Trash2,
+  Edit,
+  Upload,
+  Copy,
 } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
@@ -104,6 +108,33 @@ export default function FeatureDetailPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editFormData, setEditFormData] = useState({ title: "", description: "" });
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [bulkJsonData, setBulkJsonData] = useState("");
+  const [isBulkCreating, setIsBulkCreating] = useState(false);
+
+  const bulkImportTemplate = JSON.stringify([
+    {
+      title: "Test case 1",
+      note: "Test steps for case 1",
+      expectedOutput: "Expected result for case 1",
+      sortOrder: 0
+    },
+    {
+      title: "Test case 2",
+      note: "Test steps for case 2",
+      expectedOutput: "Expected result for case 2",
+      sortOrder: 1
+    },
+    {
+      title: "Test case 3",
+      note: "Test steps for case 3",
+      expectedOutput: "Expected result for case 3",
+      sortOrder: 2
+    }
+  ], null, 2);
 
   const featureAnalytics = {
     totalCases: cases.length || 12,
@@ -258,6 +289,59 @@ export default function FeatureDetailPage() {
     }
   };
 
+  const handleEditFeature = () => {
+    setEditFormData({
+      title: currentFeature.title || "",
+      description: currentFeature.description || "",
+    });
+    setIsEditOpen(true);
+  };
+
+  const handleUpdateFeature = async (e) => {
+    e.preventDefault();
+    setIsUpdating(true);
+    try {
+      await realApi.features.update(featureId, editFormData);
+      setIsEditOpen(false);
+      dispatch(fetchFeatureById(featureId));
+    } catch (err) {
+      console.error("Failed to update feature:", err);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleBulkImport = async (e) => {
+    e.preventDefault();
+    setIsBulkCreating(true);
+    try {
+      const parsedData = JSON.parse(bulkJsonData);
+      if (!Array.isArray(parsedData)) {
+        throw new Error("JSON must be an array of test cases");
+      }
+
+      await realApi.cases.bulkCreate(featureId, parsedData);
+      setIsBulkImportOpen(false);
+      setBulkJsonData("");
+      dispatch(fetchCases({ featureId, params: { page: 1, limit: 10 } }));
+    } catch (err) {
+      console.error("Failed to bulk import cases:", err);
+      alert(err.message || "Failed to parse JSON or import cases");
+    } finally {
+      setIsBulkCreating(false);
+    }
+  };
+
+  const handleCopyTemplate = async () => {
+    try {
+      await navigator.clipboard.writeText(bulkImportTemplate);
+      toast.success("Template copied to clipboard!");
+    } catch (err) {
+      console.error("Failed to copy template:", err);
+      toast.error("Failed to copy template");
+    }
+  };
+
   if (!currentFeature) {
     return (
       <AppLayout>
@@ -270,32 +354,42 @@ export default function FeatureDetailPage() {
     );
   }
 
-  const breadcrumbItems = [
-    { label: "Sessions", href: "/orgs" },
-    { label: currentFeature.title },
-  ];
+  const breadcrumbItems = currentFeature?.sessionId
+    ? [
+        {
+          label: currentFeature.sessionId.orgId?.name || "Organization",
+          href: `/orgs/${currentFeature.sessionId.orgId?._id}`
+        },
+        {
+          label: currentFeature.sessionId.title || "Session",
+          href: `/sessions/${currentFeature.sessionId._id}`
+        },
+        { label: currentFeature.title },
+      ]
+    : null;
 
   return (
     <AppLayout>
       <div className="space-y-6">
         <DynamicBreadcrumb />
 
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-              <Box className="h-6 w-6 text-primary" />
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
+            <Box className="h-6 w-6 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <h1 className="text-3xl font-bold break-words">{currentFeature.title}</h1>
+              <Badge variant={getStatusColor(currentFeature.status)}>
+                {currentFeature.status}
+              </Badge>
+              <Button variant="ghost" size="icon" onClick={handleEditFeature}>
+                <Edit className="h-4 w-4" />
+              </Button>
             </div>
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <h1 className="text-3xl font-bold">{currentFeature.title}</h1>
-                <Badge variant={getStatusColor(currentFeature.status)}>
-                  {currentFeature.status}
-                </Badge>
-              </div>
-              <p className="text-muted-foreground">
-                {currentFeature.description || "No description"}
-              </p>
-            </div>
+            <p className="text-muted-foreground break-words">
+              {currentFeature.description || "No description"}
+            </p>
           </div>
         </div>
 
@@ -316,13 +410,78 @@ export default function FeatureDetailPage() {
               </Select>
             </div>
 
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Test Case
-                </Button>
-              </DialogTrigger>
+            <div className="flex gap-2">
+              <Dialog open={isBulkImportOpen} onOpenChange={setIsBulkImportOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <Upload className="mr-2 h-4 w-4" />
+                    Bulk Import
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl h-[90vh] flex flex-col p-0">
+                  <form onSubmit={handleBulkImport} className="flex flex-col h-full">
+                    <div className="px-6 pt-6 flex-shrink-0">
+                      <DialogHeader>
+                        <DialogTitle>Bulk Import Test Cases</DialogTitle>
+                        <DialogDescription>
+                          Paste a JSON array of test cases. Each case should have: title (required), note, expectedOutput, and sortOrder (optional).
+                        </DialogDescription>
+                      </DialogHeader>
+                    </div>
+                    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 min-h-0">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="bulk-json">JSON Array</Label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleCopyTemplate}
+                            className="h-8"
+                          >
+                            <Copy className="mr-2 h-3 w-3" />
+                            Copy Template
+                          </Button>
+                        </div>
+                        <Textarea
+                          id="bulk-json"
+                          placeholder={bulkImportTemplate}
+                          value={bulkJsonData}
+                          onChange={(e) => setBulkJsonData(e.target.value)}
+                          className="font-mono text-sm min-h-[500px] resize-none"
+                          required
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Maximum 100 test cases per import. Click "Copy Template" to get started with a sample structure.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="px-6 pb-6 flex-shrink-0 border-t bg-background">
+                      <DialogFooter className="mt-6">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setIsBulkImportOpen(false)}
+                          disabled={isBulkCreating}
+                        >
+                          Cancel
+                        </Button>
+                        <Button type="submit" disabled={isBulkCreating}>
+                          {isBulkCreating ? "Importing..." : "Import Cases"}
+                        </Button>
+                      </DialogFooter>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Test Case
+                  </Button>
+                </DialogTrigger>
               <DialogContent>
                 <form onSubmit={handleCreate}>
                   <DialogHeader>
@@ -401,6 +560,7 @@ export default function FeatureDetailPage() {
                 </form>
               </DialogContent>
             </Dialog>
+            </div>
           </div>
 
           {casesStatus === "loading" && (
@@ -718,6 +878,56 @@ export default function FeatureDetailPage() {
               {isDeleting ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent>
+          <form onSubmit={handleUpdateFeature}>
+            <DialogHeader>
+              <DialogTitle>Edit Feature</DialogTitle>
+              <DialogDescription>
+                Update the feature title and description
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-title">Title</Label>
+                <Input
+                  id="edit-title"
+                  value={editFormData.title}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, title: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-description">Description</Label>
+                <Textarea
+                  id="edit-description"
+                  value={editFormData.description}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, description: e.target.value })
+                  }
+                  rows={4}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditOpen(false)}
+                disabled={isUpdating}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isUpdating}>
+                {isUpdating ? "Updating..." : "Update Feature"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </AppLayout>

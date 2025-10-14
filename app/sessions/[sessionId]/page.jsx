@@ -389,7 +389,7 @@ export default function SessionDetailPage() {
                   Add Feature
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[425px]">
                 <form onSubmit={handleCreateFeature}>
                   <DialogHeader>
                     <DialogTitle>Create Feature</DialogTitle>
@@ -436,15 +436,16 @@ export default function SessionDetailPage() {
                       <p className="text-xs text-muted-foreground">Lower numbers appear first</p>
                     </div>
                   </div>
-                  <DialogFooter>
+                  <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-end gap-2">
                     <Button
                       type="button"
                       variant="outline"
                       onClick={() => setIsCreateFeatureOpen(false)}
+                      className="w-full sm:w-auto"
                     >
                       Cancel
                     </Button>
-                    <Button type="submit">Create Feature</Button>
+                    <Button type="submit" className="w-full sm:w-auto">Create Feature</Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
@@ -664,7 +665,7 @@ export default function SessionDetailPage() {
                       <UserPlus className="h-4 w-4" />
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[425px]">
                     <DialogHeader>
                       <DialogTitle>Assign Member</DialogTitle>
                       <DialogDescription>
@@ -691,15 +692,16 @@ export default function SessionDetailPage() {
                         </Select>
                       </div>
                     </div>
-                    <DialogFooter>
+                    <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-end gap-2">
                       <Button
                         type="button"
                         variant="outline"
                         onClick={() => setIsAssignOpen(false)}
+                        className="w-full sm:w-auto"
                       >
                         Cancel
                       </Button>
-                      <Button onClick={handleAssign} disabled={!selectedUserId}>
+                      <Button onClick={handleAssign} disabled={!selectedUserId} className="w-full sm:w-auto">
                         Assign
                       </Button>
                     </DialogFooter>
@@ -815,19 +817,20 @@ export default function SessionDetailPage() {
       </div>
 
       <Dialog open={isDuplicateOpen} onOpenChange={setIsDuplicateOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Duplicate Session</DialogTitle>
             <DialogDescription>
               This will create a copy of this session including all features and test cases. The new session will be created with "Copy of" prefix and active status.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-end gap-2">
             <Button
               type="button"
               variant="outline"
               onClick={() => setIsDuplicateOpen(false)}
               disabled={duplicating}
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
@@ -835,6 +838,7 @@ export default function SessionDetailPage() {
               type="button"
               onClick={handleDuplicate}
               disabled={duplicating}
+              className="w-full sm:w-auto"
             >
               {duplicating ? "Duplicating..." : "Duplicate Session"}
             </Button>
@@ -843,7 +847,7 @@ export default function SessionDetailPage() {
       </Dialog>
 
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[425px]">
           <form onSubmit={handleUpdate}>
             <DialogHeader>
               <DialogTitle>Edit Session</DialogTitle>
@@ -875,16 +879,17 @@ export default function SessionDetailPage() {
                 />
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-end gap-2">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setIsEditOpen(false)}
                 disabled={updating}
+                className="w-full sm:w-auto"
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={updating}>
+              <Button type="submit" disabled={updating} className="w-full sm:w-auto">
                 {updating ? "Updating..." : "Update Session"}
               </Button>
             </DialogFooter>
@@ -893,19 +898,20 @@ export default function SessionDetailPage() {
       </Dialog>
 
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Delete Session</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete this session? This will permanently delete the session and all related features, test cases, and feedback data. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-end gap-2">
             <Button
               type="button"
               variant="outline"
               onClick={() => setIsDeleteOpen(false)}
               disabled={deleting}
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
@@ -914,6 +920,7 @@ export default function SessionDetailPage() {
               variant="destructive"
               onClick={handleDelete}
               disabled={deleting}
+              className="w-full sm:w-auto"
             >
               {deleting ? "Deleting..." : "Delete Session"}
             </Button>
