@@ -92,6 +92,7 @@ export default function FeatureDetailPage() {
     title: "",
     note: "",
     expectedOutput: "",
+    sortOrder: 0,
   });
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -102,6 +103,7 @@ export default function FeatureDetailPage() {
   const [historyPage, setHistoryPage] = useState(1);
   const [deleteModalOpen, setDeleteModalOpen] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   const featureAnalytics = {
     totalCases: cases.length || 12,
@@ -189,13 +191,16 @@ export default function FeatureDetailPage() {
 
   const handleCreate = async (e) => {
     e.preventDefault();
+    setIsCreating(true);
     try {
       await dispatch(createCase({ featureId, data: formData })).unwrap();
       setIsCreateOpen(false);
-      setFormData({ title: "", note: "", expectedOutput: "" });
+      setFormData({ title: "", note: "", expectedOutput: "", sortOrder: 0 });
       dispatch(fetchCases({ featureId, params: { page: 1, limit: 10 } }));
     } catch (err) {
       console.error("[v0] Failed to create case:", err);
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -294,163 +299,6 @@ export default function FeatureDetailPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Cases</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {featureAnalytics.totalCases}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Test cases created
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pass Rate</CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {Math.round(
-                  (featureAnalytics.passedCases / featureAnalytics.totalCases) *
-                    100
-                )}
-                %
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {featureAnalytics.passedCases} passed
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Failed</CardTitle>
-              <XCircle className="h-4 w-4 text-red-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">
-                {featureAnalytics.failedCases}
-              </div>
-              <p className="text-xs text-muted-foreground">Need attention</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Testers</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {featureAnalytics.uniqueTesters}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Unique contributors
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
-                Test Coverage Timeline
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer
-                config={{
-                  tested: { label: "Tested", color: "hsl(var(--chart-4))" },
-                  passed: { label: "Passed", color: "hsl(var(--chart-2))" },
-                  failed: { label: "Failed", color: "hsl(var(--chart-1))" },
-                }}
-                className="h-[250px]"
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={featureAnalytics.coverageTimeline}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="week" />
-                    <YAxis />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="tested"
-                      stroke="var(--color-tested)"
-                      strokeWidth={2}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="passed"
-                      stroke="var(--color-passed)"
-                      strokeWidth={2}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="failed"
-                      stroke="var(--color-failed)"
-                      strokeWidth={2}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                Tester Contributions
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer
-                config={{
-                  tested: { label: "Tested", color: "hsl(var(--chart-4))" },
-                  passed: { label: "Passed", color: "hsl(var(--chart-2))" },
-                  failed: { label: "Failed", color: "hsl(var(--chart-1))" },
-                }}
-                className="h-[250px]"
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={featureAnalytics.testerStats}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Legend />
-                    <Bar
-                      dataKey="tested"
-                      fill="var(--color-tested)"
-                      name="Tested"
-                    />
-                    <Bar
-                      dataKey="passed"
-                      fill="var(--color-passed)"
-                      name="Passed"
-                    />
-                    <Bar
-                      dataKey="failed"
-                      fill="var(--color-failed)"
-                      name="Failed"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-        </div>
-
         <div className="space-y-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
@@ -523,16 +371,32 @@ export default function FeatureDetailPage() {
                         rows={2}
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="sortOrder">Sort Order (optional)</Label>
+                      <Input
+                        id="sortOrder"
+                        type="number"
+                        placeholder="0"
+                        value={formData.sortOrder}
+                        onChange={(e) =>
+                          setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground">Lower numbers appear first</p>
+                    </div>
                   </div>
                   <DialogFooter>
                     <Button
                       type="button"
                       variant="outline"
                       onClick={() => setIsCreateOpen(false)}
+                      disabled={isCreating}
                     >
                       Cancel
                     </Button>
-                    <Button type="submit">Create Case</Button>
+                    <Button type="submit" disabled={isCreating}>
+                      {isCreating ? "Creating..." : "Create Case"}
+                    </Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
@@ -578,7 +442,10 @@ export default function FeatureDetailPage() {
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
+                            <Badge variant="outline" className="text-xs font-mono">
+                              #{testCase.sortOrder || 0}
+                            </Badge>
                             <Link
                               href={`/cases/${testCase._id}`}
                               className="hover:underline"

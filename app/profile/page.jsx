@@ -1,27 +1,33 @@
-"use client"
+"use client";
 
-import { useSelector, useDispatch } from "react-redux"
-import { useRouter } from "next/navigation"
-import { logout } from "@/lib/slices/authSlice"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import AppLayout from "@/components/layout/app-layout"
-import { formatLocalDateTime } from "@/lib/utils/time"
-import { User, Mail, Calendar, LogOut, Building2 } from "lucide-react"
-import Link from "next/link"
+import { useSelector, useDispatch } from "react-redux";
+import { useRouter } from "next/navigation";
+import { logout } from "@/lib/slices/authSlice";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import AppLayout from "@/components/layout/app-layout";
+import { formatLocalDateTime } from "@/lib/utils/time";
+import { User, Mail, Calendar, LogOut, Building2 } from "lucide-react";
+import Link from "next/link";
 
 export default function ProfilePage() {
-  const { user } = useSelector((state) => state.auth)
-  const { list: orgs } = useSelector((state) => state.orgs)
-  const dispatch = useDispatch()
-  const router = useRouter()
+  const { user } = useSelector((state) => state.auth);
+  const { list: orgs } = useSelector((state) => state.orgs);
+  const dispatch = useDispatch();
+  const router = useRouter();
 
   const handleLogout = async () => {
-    await dispatch(logout())
-    router.push("/login")
-  }
+    await dispatch(logout());
+    router.push("/login");
+  };
 
   const getInitials = (name) => {
     return name
@@ -29,8 +35,8 @@ export default function ProfilePage() {
       .map((n) => n[0])
       .join("")
       .toUpperCase()
-      .slice(0, 2)
-  }
+      .slice(0, 2);
+  };
 
   if (!user) {
     return (
@@ -39,7 +45,7 @@ export default function ProfilePage() {
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </AppLayout>
-    )
+    );
   }
 
   return (
@@ -47,7 +53,9 @@ export default function ProfilePage() {
       <div className="space-y-6 max-w-4xl">
         <div>
           <h1 className="text-3xl font-bold">Profile</h1>
-          <p className="text-muted-foreground">Manage your account information</p>
+          <p className="text-muted-foreground">
+            Manage your account information
+          </p>
         </div>
 
         <Card>
@@ -58,14 +66,16 @@ export default function ProfilePage() {
           <CardContent>
             <div className="flex flex-col sm:flex-row items-start gap-6">
               <Avatar className="h-20 w-20">
-                <AvatarFallback className="text-2xl">{getInitials(user.name)}</AvatarFallback>
+                <AvatarFallback className="text-2xl">
+                  {getInitials(user.fullName)}
+                </AvatarFallback>
               </Avatar>
               <div className="flex-1 space-y-4">
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4 text-muted-foreground" />
                   <div>
                     <p className="text-sm text-muted-foreground">Name</p>
-                    <p className="font-medium">{user.name}</p>
+                    <p className="font-medium">{user.fullName}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -78,8 +88,12 @@ export default function ProfilePage() {
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                   <div>
-                    <p className="text-sm text-muted-foreground">Member Since</p>
-                    <p className="font-medium">{formatLocalDateTime(user.createdAt)}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Member Since
+                    </p>
+                    <p className="font-medium">
+                      {formatLocalDateTime(user.createdAt)}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -98,7 +112,9 @@ export default function ProfilePage() {
           <CardContent>
             {orgs.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-sm text-muted-foreground mb-4">You're not part of any organizations yet</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  You're not part of any organizations yet
+                </p>
                 <Link href="/orgs">
                   <Button>Browse Organizations</Button>
                 </Link>
@@ -106,7 +122,7 @@ export default function ProfilePage() {
             ) : (
               <div className="space-y-3">
                 {orgs.map((org) => (
-                  <Link key={org.id} href={`/orgs/${org.id}`}>
+                  <Link key={org._id} href={`/orgs/${org._id}`}>
                     <div className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent transition-colors cursor-pointer">
                       <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -119,7 +135,11 @@ export default function ProfilePage() {
                           </p>
                         </div>
                       </div>
-                      <Badge variant={org.ownerId === user.id ? "default" : "secondary"}>
+                      <Badge
+                        variant={
+                          org.ownerId === user.id ? "default" : "secondary"
+                        }
+                      >
                         {org.ownerId === user.id ? "Owner" : "Member"}
                       </Badge>
                     </div>
@@ -144,5 +164,5 @@ export default function ProfilePage() {
         </Card>
       </div>
     </AppLayout>
-  )
+  );
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   fetchSessionById,
   assignUserToSession,
@@ -38,6 +38,7 @@ import { DynamicBreadcrumb } from "@/components/ui/dynamic-breadcrumb";
 import AppLayout from "@/components/layout/app-layout";
 import FeaturesList from "@/components/features/features-list";
 import { formatLocalDate } from "@/lib/utils/time";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   PlayCircle,
   Calendar,
@@ -50,6 +51,10 @@ import {
   Zap,
   Copy,
   Plus,
+  Trash2,
+  Activity,
+  Clock,
+  Edit,
 } from "lucide-react";
 import { toast } from "sonner";
 import { realApi } from "@/lib/realApi";
@@ -77,16 +82,26 @@ import {
 export default function SessionDetailPage() {
   const params = useParams();
   const sessionId = params.sessionId;
+  const router = useRouter();
   const dispatch = useDispatch();
   const { currentSession } = useSelector((state) => state.sessions);
   const { members } = useSelector((state) => state.orgs);
+  const { user } = useSelector((state) => state.auth);
   const [isAssignOpen, setIsAssignOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [duplicating, setDuplicating] = useState(false);
   const [featureStats, setFeatureStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [isCreateFeatureOpen, setIsCreateFeatureOpen] = useState(false);
-  const [featureFormData, setFeatureFormData] = useState({ title: "", description: "" });
+  const [featureFormData, setFeatureFormData] = useState({ title: "", description: "", sortOrder: 0 });
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [activityLogs, setActivityLogs] = useState([]);
+  const [loadingActivity, setLoadingActivity] = useState(false);
+  const [isDuplicateOpen, setIsDuplicateOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editFormData, setEditFormData] = useState({ title: "", description: "" });
+  const [updating, setUpdating] = useState(false);
 
   // Fetch real feature statistics
   useEffect(() => {
@@ -107,6 +122,20 @@ export default function SessionDetailPage() {
 
     fetchStats();
   }, [sessionId]);
+
+  // Fetch activity logs
+  const fetchActivity = async () => {
+    setLoadingActivity(true);
+    try {
+      const response = await realApi.changelog.getAll("Session", sessionId, { limit: 20 });
+      // The API returns data as an array directly
+      setActivityLogs(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error("Failed to fetch activity logs:", error);
+    } finally {
+      setLoadingActivity(false);
+    }
+  };
 
   // Calculate session analytics from real data
   const sessionAnalytics = featureStats
@@ -209,6 +238,7 @@ export default function SessionDetailPage() {
     try {
       const response = await realApi.sessions.duplicate(sessionId);
       toast.success(`Session duplicated successfully: ${response.data.title}`);
+      setIsDuplicateOpen(false);
       // Optionally redirect to the new session
       window.location.href = `/sessions/${response.data._id}`;
     } catch (error) {
@@ -223,12 +253,49 @@ export default function SessionDetailPage() {
     try {
       await dispatch(createFeature({ sessionId, data: featureFormData })).unwrap();
       setIsCreateFeatureOpen(false);
-      setFeatureFormData({ title: "", description: "" });
+      setFeatureFormData({ title: "", description: "", sortOrder: 0 });
       dispatch(fetchFeatures({ sessionId, params: { page: 1, limit: 10 } }));
       toast.success("Feature created successfully");
     } catch (err) {
       console.error("Failed to create feature:", err);
       toast.error("Failed to create feature");
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await realApi.sessions.delete(sessionId);
+      toast.success("Session deleted successfully");
+      router.push(`/orgs/${currentSession?.orgId?._id || '/orgs'}`);
+    } catch (error) {
+      toast.error(error.message || "Failed to delete session");
+    } finally {
+      setDeleting(false);
+      setIsDeleteOpen(false);
+    }
+  };
+
+  const handleEdit = () => {
+    setEditFormData({
+      title: currentSession.title,
+      description: currentSession.description || "",
+    });
+    setIsEditOpen(true);
+  };
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    setUpdating(true);
+    try {
+      await realApi.sessions.update(sessionId, editFormData);
+      toast.success("Session updated successfully");
+      setIsEditOpen(false);
+      dispatch(fetchSessionById(sessionId));
+    } catch (error) {
+      toast.error(error.message || "Failed to update session");
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -270,29 +337,51 @@ export default function SessionDetailPage() {
     );
   }
 
+  const breadcrumbItems = currentSession?.orgId?._id
+    ? [
+        { label: currentSession.orgId.name || "Organization", href: `/orgs/${currentSession.orgId._id}` },
+        { label: currentSession.title }
+      ]
+    : null;
+
   return (
     <AppLayout>
-      <DynamicBreadcrumb />
+      <DynamicBreadcrumb items={breadcrumbItems} />
 
       <div className="space-y-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-              <PlayCircle className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <h1 className="text-3xl font-bold">{currentSession.title}</h1>
-                <Badge variant={getStatusColor(currentSession.status)}>
-                  {currentSession.status}
-                </Badge>
-              </div>
-              <p className="text-muted-foreground">
-                {currentSession.description || "No description"}
-              </p>
-            </div>
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
+            <PlayCircle className="h-6 w-6 text-primary" />
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <h1 className="text-3xl font-bold break-words">{currentSession.title}</h1>
+              <Badge variant={getStatusColor(currentSession.status)}>
+                {currentSession.status}
+              </Badge>
+              {user && currentSession?.createdBy?._id === user._id && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={handleEdit}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            <p className="text-muted-foreground mb-4 break-words">
+              {currentSession.description || "No description"}
+            </p>
+
+            <div className="flex gap-2 flex-wrap items-center">
+            <Link href={`/sessions/${sessionId}/quick-test`}>
+              <Button className="gap-2">
+                <Zap className="h-4 w-4" />
+                Quick Test Mode
+              </Button>
+            </Link>
+
             <Dialog open={isCreateFeatureOpen} onOpenChange={setIsCreateFeatureOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" className="gap-2">
@@ -333,6 +422,19 @@ export default function SessionDetailPage() {
                         rows={3}
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="feature-sortOrder">Sort Order (optional)</Label>
+                      <Input
+                        id="feature-sortOrder"
+                        type="number"
+                        placeholder="0"
+                        value={featureFormData.sortOrder}
+                        onChange={(e) =>
+                          setFeatureFormData({ ...featureFormData, sortOrder: parseInt(e.target.value) || 0 })
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground">Lower numbers appear first</p>
+                    </div>
                   </div>
                   <DialogFooter>
                     <Button
@@ -347,21 +449,28 @@ export default function SessionDetailPage() {
                 </form>
               </DialogContent>
             </Dialog>
+
             <Button
               variant="outline"
               className="gap-2"
-              onClick={handleDuplicate}
+              onClick={() => setIsDuplicateOpen(true)}
               disabled={duplicating}
             >
               <Copy className="h-4 w-4" />
-              {duplicating ? "Duplicating..." : "Duplicate Session"}
+              Duplicate
             </Button>
-            <Link href={`/sessions/${sessionId}/quick-test`}>
-              <Button className="gap-2">
-                <Zap className="h-4 w-4" />
-                Quick Test Mode
+
+            {user && currentSession?.createdBy?._id === user._id && (
+              <Button
+                variant="outline"
+                className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => setIsDeleteOpen(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
               </Button>
-            </Link>
+            )}
+            </div>
           </div>
         </div>
 
@@ -514,56 +623,6 @@ export default function SessionDetailPage() {
           </Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Daily Testing Progress
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer
-              config={{
-                tested: { label: "Tested", color: "hsl(var(--chart-4))" },
-                passed: { label: "Passed", color: "hsl(var(--chart-2))" },
-                failed: { label: "Failed", color: "hsl(var(--chart-1))" },
-              }}
-              className="h-[300px]"
-            >
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={sessionAnalytics.dailyProgress}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="tested"
-                    stroke="var(--color-tested)"
-                    name="Tested"
-                    strokeWidth={2}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="passed"
-                    stroke="var(--color-passed)"
-                    name="Passed"
-                    strokeWidth={2}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="failed"
-                    stroke="var(--color-failed)"
-                    name="Failed"
-                    strokeWidth={2}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>
@@ -683,8 +742,184 @@ export default function SessionDetailPage() {
           </Card>
         </div>
 
-        <FeaturesList sessionId={sessionId} />
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="activity" onClick={fetchActivity}>
+              <Activity className="h-4 w-4 mr-2" />
+              Activity
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="mt-6">
+            <FeaturesList sessionId={sessionId} />
+          </TabsContent>
+
+          <TabsContent value="activity" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Session Activity
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loadingActivity ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-16 w-full" />
+                    ))}
+                  </div>
+                ) : activityLogs.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Activity className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>No activity logs yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {activityLogs.map((log) => (
+                      <div
+                        key={log._id}
+                        className="flex items-start gap-4 p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                      >
+                        <div className="flex-shrink-0 mt-1">
+                          {log.action === "create" && (
+                            <Plus className="h-5 w-5 text-green-600" />
+                          )}
+                          {log.action === "update" && (
+                            <TrendingUp className="h-5 w-5 text-blue-600" />
+                          )}
+                          {log.action === "delete" && (
+                            <Trash2 className="h-5 w-5 text-red-600" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium">
+                            <span className="capitalize">{log.action}</span> {log.entityType}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            by {log.performedBy?.fullName || log.userId?.fullName || "Unknown"}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {new Date(log.timestamp).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
+
+      <Dialog open={isDuplicateOpen} onOpenChange={setIsDuplicateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Duplicate Session</DialogTitle>
+            <DialogDescription>
+              This will create a copy of this session including all features and test cases. The new session will be created with "Copy of" prefix and active status.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDuplicateOpen(false)}
+              disabled={duplicating}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleDuplicate}
+              disabled={duplicating}
+            >
+              {duplicating ? "Duplicating..." : "Duplicate Session"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent>
+          <form onSubmit={handleUpdate}>
+            <DialogHeader>
+              <DialogTitle>Edit Session</DialogTitle>
+              <DialogDescription>
+                Update the session title and description
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-title">Session Title</Label>
+                <Input
+                  id="edit-title"
+                  value={editFormData.title}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, title: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-description">Description</Label>
+                <Textarea
+                  id="edit-description"
+                  value={editFormData.description}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, description: e.target.value })
+                  }
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditOpen(false)}
+                disabled={updating}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={updating}>
+                {updating ? "Updating..." : "Update Session"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Session</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this session? This will permanently delete the session and all related features, test cases, and feedback data. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDeleteOpen(false)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting ? "Deleting..." : "Delete Session"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

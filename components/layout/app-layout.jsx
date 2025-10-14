@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Building2, LogOut, User, Menu, PartyPopper } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import Cookie from "js-cookie";
 import { realApi } from "@/lib/realApi";
@@ -28,13 +28,15 @@ export default function AppLayout({ children }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [invitationCount, setInvitationCount] = useState(0);
+  const invitationLoadedRef = useRef(false);
 
   useEffect(() => setMounted(true), []);
 
-  // Fetch invitation count only on initial load
+  // Fetch invitation count only once on mount when user is available
   useEffect(() => {
     const fetchInvitationCount = async () => {
-      if (user) {
+      if (user && !invitationLoadedRef.current) {
+        invitationLoadedRef.current = true;
         try {
           const response = await realApi.invitations.getCount();
           setInvitationCount(response.data.count || 0);

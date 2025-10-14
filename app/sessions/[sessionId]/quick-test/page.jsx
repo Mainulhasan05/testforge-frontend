@@ -305,21 +305,25 @@ export default function QuickTestPage() {
 
   const { session, features, stats } = dashboardData;
 
+  const breadcrumbItems = session?.orgId?._id
+    ? [
+        { label: session.orgId.name || "Organization", href: `/orgs/${session.orgId._id}` },
+        { label: session.title, href: `/sessions/${sessionId}` },
+        { label: "Quick Test Mode" }
+      ]
+    : null;
+
   return (
     <AppLayout>
-      <DynamicBreadcrumb />
+      <DynamicBreadcrumb items={breadcrumbItems} />
       <div className="space-y-6">
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <Zap className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold">Quick Test Mode</h1>
-                <p className="text-sm text-muted-foreground">{session.title}</p>
-              </div>
-            </div>
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
+            <Zap className="h-5 w-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl font-bold">Quick Test Mode</h1>
+            <p className="text-sm text-muted-foreground break-words">{session.title}</p>
           </div>
         </div>
 
