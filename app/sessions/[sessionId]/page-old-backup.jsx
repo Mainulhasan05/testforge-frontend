@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/select";
 import { DynamicBreadcrumb } from "@/components/ui/dynamic-breadcrumb";
 import AppLayout from "@/components/layout/app-layout";
+import FeaturesList from "@/components/features/features-list";
 import { formatLocalDate } from "@/lib/utils/time";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -55,9 +56,7 @@ import {
   Clock,
   Edit,
   Box,
-  ChevronDown,
-  ChevronUp,
-  FileText,
+  PieChart,
 } from "lucide-react";
 import { toast } from "sonner";
 import { realApi } from "@/lib/realApi";
@@ -65,6 +64,8 @@ import Link from "next/link";
 import {
   Bar,
   BarChart,
+  Line,
+  LineChart,
   Pie,
   PieChart as RechartsPieChart,
   Cell,
@@ -79,11 +80,6 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 
 export default function SessionDetailPage() {
   const params = useParams();
@@ -91,16 +87,15 @@ export default function SessionDetailPage() {
   const router = useRouter();
   const dispatch = useDispatch();
   const { currentSession } = useSelector((state) => state.sessions);
-  const { list: features, status: featuresStatus } = useSelector((state) => state.features);
   const { members } = useSelector((state) => state.orgs);
   const { user } = useSelector((state) => state.auth);
   const [isAssignOpen, setIsAssignOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [duplicating, setDuplicating] = useState(false);
-  const [dashboardData, setDashboardData] = useState(null);
-  const [loadingDashboard, setLoadingDashboard] = useState(true);
+  const [featureStats, setFeatureStats] = useState(null);
+  const [loadingStats, setLoadingStats] = useState(true);
   const [isCreateFeatureOpen, setIsCreateFeatureOpen] = useState(false);
-  const [featureFormData, setFeatureFormData] = useState({ title: "", description: "", sortOrder: "" });
+  const [featureFormData, setFeatureFormData] = useState({ title: "", description: "", sortOrder: 0 });
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [activityLogs, setActivityLogs] = useState([]);
@@ -109,14 +104,11 @@ export default function SessionDetailPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editFormData, setEditFormData] = useState({ title: "", description: "" });
   const [updating, setUpdating] = useState(false);
-  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
-  const [selectedActivity, setSelectedActivity] = useState(null);
 
   useEffect(() => {
     if (sessionId) {
       dispatch(fetchSessionById(sessionId));
-      dispatch(fetchFeatures({ sessionId, params: { page: 1, limit: 100 } }));
-      fetchDashboard();
+      fetchStats();
     }
   }, [dispatch, sessionId]);
 
@@ -126,17 +118,17 @@ export default function SessionDetailPage() {
     }
   }, [dispatch, currentSession?.orgId?._id]);
 
-  const fetchDashboard = async () => {
-    setLoadingDashboard(true);
+  const fetchStats = async () => {
+    setLoadingStats(true);
     try {
       const response = await realApi.sessions.getDashboard(sessionId);
       if (response.success) {
-        setDashboardData(response.data);
+        setFeatureStats(response.data);
       }
     } catch (error) {
-      console.error("Failed to fetch dashboard:", error);
+      console.error("Failed to fetch stats:", error);
     } finally {
-      setLoadingDashboard(false);
+      setLoadingStats(false);
     }
   };
 
@@ -198,8 +190,8 @@ export default function SessionDetailPage() {
     try {
       await dispatch(createFeature({ sessionId, data: featureFormData })).unwrap();
       setIsCreateFeatureOpen(false);
-      setFeatureFormData({ title: "", description: "", sortOrder: "" });
-      dispatch(fetchFeatures({ sessionId, params: { page: 1, limit: 100 } }));
+      setFeatureFormData({ title: "", description: "", sortOrder: 0 });
+      dispatch(fetchFeatures({ sessionId, params: { page: 1, limit: 10 } }));
       toast.success("Feature created successfully");
     } catch (err) {
       console.error("Failed to create feature:", err);
@@ -266,69 +258,8 @@ export default function SessionDetailPage() {
       .slice(0, 2);
   };
 
-  const formatChangeValue = (key, value) => {
-    if (!value) return "None";
-    if (key === "assignees" && Array.isArray(value)) {
-      return `${value.length} tester${value.length !== 1 ? 's' : ''}`;
-    }
-    if (key.toLowerCase().includes("date")) {
-      return new Date(value).toLocaleDateString();
-    }
-    if (typeof value === "object" && value._id) {
-      return value.title || value.name || value._id;
-    }
-    if (typeof value === "string" && value.length > 50) {
-      return value.slice(0, 50) + "...";
-    }
-    return String(value);
-  };
-
-  const getChangeDetails = (log) => {
-    if (!log.before && !log.after) return null;
-
-    const changes = [];
-    const before = log.before || {};
-    const after = log.after || {};
-
-    // Get all unique keys
-    const allKeys = new Set([...Object.keys(before), ...Object.keys(after)]);
-
-    // Filter out technical fields
-    const ignoreKeys = ["_id", "__v", "createdAt", "updatedAt", "orgId", "sessionId", "featureId", "caseId", "createdBy", "testerId"];
-
-    allKeys.forEach((key) => {
-      if (ignoreKeys.includes(key)) return;
-
-      const beforeVal = before[key];
-      const afterVal = after[key];
-
-      if (JSON.stringify(beforeVal) !== JSON.stringify(afterVal)) {
-        changes.push({
-          field: key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1'),
-          before: formatChangeValue(key, beforeVal),
-          after: formatChangeValue(key, afterVal),
-        });
-      }
-    });
-
-    return changes;
-  };
-
-  // Map backend response to expected format
-  const sessionAnalytics = dashboardData ? {
-    totalFeatures: dashboardData.summary?.totalFeatures || 0,
-    totalCases: dashboardData.summary?.totalCases || 0,
-    passedCases: dashboardData.features?.reduce((sum, f) => sum + f.passedCases, 0) || 0,
-    failedCases: dashboardData.features?.reduce((sum, f) => sum + f.failedCases, 0) || 0,
-    pendingCases: dashboardData.features?.reduce((sum, f) => sum + (f.totalCases - f.testedCases), 0) || 0,
-    activeTesters: currentSession?.assignees?.length || 0,
-    featureStats: dashboardData.features?.map(f => ({
-      name: f.title.length > 15 ? f.title.substring(0, 15) + '...' : f.title,
-      passed: f.passedCases,
-      failed: f.failedCases,
-    })) || [],
-  } : {
-    totalFeatures: features.length || 0,
+  const sessionAnalytics = featureStats || {
+    totalFeatures: 0,
     totalCases: 0,
     passedCases: 0,
     failedCases: 0,
@@ -371,252 +302,184 @@ export default function SessionDetailPage() {
       <DynamicBreadcrumb items={breadcrumbItems} />
 
       <div className="space-y-6">
-        {/* Improved Header */}
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-4 flex-1 min-w-0">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
-              <PlayCircle className="h-6 w-6 text-primary" />
+        {/* Header */}
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
+            <PlayCircle className="h-6 w-6 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <h1 className="text-3xl font-bold break-words">{currentSession.title}</h1>
+              <Badge variant={getStatusColor(currentSession.status)}>
+                {currentSession.status}
+              </Badge>
+              {user && currentSession?.createdBy?._id === user._id && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={handleEdit}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              )}
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold break-words">{currentSession.title}</h1>
-                <Badge variant={getStatusColor(currentSession.status)}>
-                  {currentSession.status}
-                </Badge>
-                {user && currentSession?.createdBy?._id === user._id && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={handleEdit}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
+            <p className="text-muted-foreground mb-4 break-words">
+              {currentSession.description || "No description"}
+            </p>
 
-              {/* Collapsible Description */}
-              {currentSession.description && (
-                <Collapsible open={descriptionExpanded} onOpenChange={setDescriptionExpanded}>
-                  <div className="flex items-center gap-2">
-                    <CollapsibleTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-6 px-2 text-muted-foreground">
-                        {descriptionExpanded ? (
-                          <>
-                            <ChevronUp className="h-3 w-3 mr-1" />
-                            Hide description
-                          </>
-                        ) : (
-                          <>
-                            <ChevronDown className="h-3 w-3 mr-1" />
-                            Show description
-                          </>
-                        )}
+            <div className="flex gap-2 flex-wrap items-center">
+              <Link href={`/sessions/${sessionId}/quick-test`}>
+                <Button className="gap-2">
+                  <Zap className="h-4 w-4" />
+                  Quick Test Mode
+                </Button>
+              </Link>
+
+              <Dialog open={isCreateFeatureOpen} onOpenChange={setIsCreateFeatureOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="default" className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Add Feature
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[425px]">
+                  <form onSubmit={handleCreateFeature}>
+                    <DialogHeader>
+                      <DialogTitle>Create Feature</DialogTitle>
+                      <DialogDescription>
+                        Add a new feature to test in this session
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="title">Feature Title</Label>
+                        <Input
+                          id="title"
+                          placeholder="Enter feature name"
+                          value={featureFormData.title}
+                          onChange={(e) =>
+                            setFeatureFormData({ ...featureFormData, title: e.target.value })
+                          }
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="description">Description (optional)</Label>
+                        <Textarea
+                          id="description"
+                          placeholder="Describe the feature"
+                          value={featureFormData.description}
+                          onChange={(e) =>
+                            setFeatureFormData({ ...featureFormData, description: e.target.value })
+                          }
+                          rows={3}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="sortOrder">Sort Order</Label>
+                        <Input
+                          id="sortOrder"
+                          type="number"
+                          placeholder="0"
+                          value={featureFormData.sortOrder}
+                          onChange={(e) =>
+                            setFeatureFormData({ ...featureFormData, sortOrder: parseInt(e.target.value) || 0 })
+                          }
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsCreateFeatureOpen(false)}
+                      >
+                        Cancel
                       </Button>
-                    </CollapsibleTrigger>
-                  </div>
-                  <CollapsibleContent className="mt-2">
-                    <p className="text-muted-foreground break-words">
-                      {currentSession.description}
-                    </p>
-                  </CollapsibleContent>
-                </Collapsible>
+                      <Button type="submit">Create Feature</Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => setIsDuplicateOpen(true)}
+                disabled={duplicating}
+              >
+                <Copy className="h-4 w-4" />
+                Duplicate
+              </Button>
+
+              {user && currentSession?.createdBy?._id === user._id && (
+                <Button
+                  variant="outline"
+                  className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => setIsDeleteOpen(true)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </Button>
               )}
             </div>
           </div>
-
-          {/* Quick Actions - Right Corner */}
-          <div className="flex gap-2 flex-shrink-0">
-            <Link href={`/sessions/${sessionId}/quick-test`}>
-              <Button className="gap-2">
-                <Zap className="h-4 w-4" />
-                <span className="hidden sm:inline">Quick Test</span>
-              </Button>
-            </Link>
-          </div>
         </div>
 
-        {/* Secondary Actions */}
-        <div className="flex gap-2 flex-wrap">
-          <Dialog open={isCreateFeatureOpen} onOpenChange={setIsCreateFeatureOpen}>
-            <DialogTrigger asChild>
-              <Button variant="default" className="gap-2">
-                <Plus className="h-4 w-4" />
-                Add Feature
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[425px]">
-              <form onSubmit={handleCreateFeature}>
-                <DialogHeader>
-                  <DialogTitle>Create Feature</DialogTitle>
-                  <DialogDescription>
-                    Add a new feature to test in this session
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="title">Feature Title</Label>
-                    <Input
-                      id="title"
-                      placeholder="Enter feature name"
-                      value={featureFormData.title}
-                      onChange={(e) =>
-                        setFeatureFormData({ ...featureFormData, title: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description (optional)</Label>
-                    <Textarea
-                      id="description"
-                      placeholder="Describe the feature"
-                      value={featureFormData.description}
-                      onChange={(e) =>
-                        setFeatureFormData({ ...featureFormData, description: e.target.value })
-                      }
-                      rows={3}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="sortOrder">Sort Order (optional)</Label>
-                    <Input
-                      id="sortOrder"
-                      type="number"
-                      placeholder="Enter sort order"
-                      value={featureFormData.sortOrder}
-                      onChange={(e) =>
-                        setFeatureFormData({ ...featureFormData, sortOrder: e.target.value })
-                      }
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsCreateFeatureOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit">Create Feature</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() => setIsDuplicateOpen(true)}
-            disabled={duplicating}
-          >
-            <Copy className="h-4 w-4" />
-            <span className="hidden sm:inline">Duplicate</span>
-          </Button>
-
-          {user && currentSession?.createdBy?._id === user._id && (
-            <Button
-              variant="outline"
-              className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-              onClick={() => setIsDeleteOpen(true)}
-            >
-              <Trash2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Delete</span>
-            </Button>
-          )}
-        </div>
-
-        {/* Main Tabs */}
+        {/* Main Tabs - Features First */}
         <Tabs defaultValue="features" className="w-full">
           <TabsList className="grid w-full grid-cols-4 max-w-[600px]">
             <TabsTrigger value="features" className="gap-2">
               <Box className="h-4 w-4" />
-              <span className="hidden sm:inline">Features</span>
+              Features
             </TabsTrigger>
             <TabsTrigger value="analytics" className="gap-2">
               <BarChart3 className="h-4 w-4" />
-              <span className="hidden sm:inline">Analytics</span>
+              Analytics
             </TabsTrigger>
-            <TabsTrigger value="testers" className="gap-2">
+            <TabsTrigger value="team" className="gap-2">
               <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Testers</span>
+              Team
             </TabsTrigger>
             <TabsTrigger value="activity" onClick={fetchActivity} className="gap-2">
               <Activity className="h-4 w-4" />
-              <span className="hidden sm:inline">Activity</span>
+              Activity
             </TabsTrigger>
           </TabsList>
 
-          {/* Features Tab - Grid Layout */}
+          {/* Features Tab - Primary View */}
           <TabsContent value="features" className="mt-6 space-y-4">
-            {featuresStatus === "loading" && (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <Card key={i}>
-                    <CardHeader>
-                      <Skeleton className="h-6 w-3/4" />
-                      <Skeleton className="h-4 w-full" />
-                    </CardHeader>
-                  </Card>
-                ))}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">Test Features</h2>
+                <p className="text-muted-foreground">
+                  Manage and organize your testing features
+                </p>
               </div>
-            )}
-
-            {featuresStatus === "succeeded" && features.length === 0 && (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Box className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No features yet</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Add features to start testing
-                  </p>
-                  <Button onClick={() => setIsCreateFeatureOpen(true)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Feature
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-
-            {featuresStatus === "succeeded" && features.length > 0 && (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {features.map((feature) => (
-                  <Link key={feature._id} href={`/features/${feature._id}`}>
-                    <Card className="transition-all hover:shadow-md hover:border-primary/50 cursor-pointer h-full">
-                      <CardHeader>
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <Badge variant="outline" className="text-xs font-mono">
-                            #{feature.sortOrder || 0}
-                          </Badge>
-                          <Badge variant={getStatusColor(feature.status)} className="text-xs">
-                            {feature.status || 'pending'}
-                          </Badge>
-                        </div>
-                        <CardTitle className="text-lg line-clamp-2">
-                          {feature.title}
-                        </CardTitle>
-                        {feature.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-2 mt-2">
-                            {feature.description}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-4 mt-4 pt-4 border-t">
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                            <FileText className="h-4 w-4" />
-                            <span>{feature.caseCount || 0} cases</span>
-                          </div>
-                        </div>
-                      </CardHeader>
-                    </Card>
-                  </Link>
-                ))}
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  {sessionAnalytics.totalFeatures} Features
+                </Button>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  {sessionAnalytics.totalCases} Cases
+                </Button>
               </div>
-            )}
+            </div>
+            <FeaturesList sessionId={sessionId} />
           </TabsContent>
 
           {/* Analytics Tab */}
           <TabsContent value="analytics" className="mt-6 space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold mb-2">Test Analytics</h2>
+              <p className="text-muted-foreground">
+                View detailed statistics and insights
+              </p>
+            </div>
+
             {/* Stats Cards */}
             <div className="grid gap-4 md:grid-cols-4">
               <Card>
@@ -746,7 +609,7 @@ export default function SessionDetailPage() {
                       className="h-[300px]"
                     >
                       <ResponsiveContainer width="100%" height="100%" minWidth={400}>
-                        <BarChart data={sessionAnalytics.featureStats || []}>
+                        <BarChart data={sessionAnalytics.featureStats}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="name" />
                           <YAxis />
@@ -799,18 +662,18 @@ export default function SessionDetailPage() {
             </Card>
           </TabsContent>
 
-          {/* Testers Tab */}
-          <TabsContent value="testers" className="mt-6">
+          {/* Team Tab */}
+          <TabsContent value="team" className="mt-6">
             <Card>
               <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-center justify-between">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Users className="h-4 w-4" />
                     Assigned Testers ({currentSession.assignees?.length || 0})
                   </CardTitle>
                   <Dialog open={isAssignOpen} onOpenChange={setIsAssignOpen}>
                     <DialogTrigger asChild>
-                      <Button size="sm" variant="outline" className="gap-2 w-full sm:w-auto">
+                      <Button size="sm" variant="outline" className="gap-2">
                         <UserPlus className="h-4 w-4" />
                         Assign User
                       </Button>
@@ -894,7 +757,7 @@ export default function SessionDetailPage() {
             </Card>
           </TabsContent>
 
-          {/* Activity Tab with Details Modal */}
+          {/* Activity Tab */}
           <TabsContent value="activity" className="mt-6">
             <Card>
               <CardHeader>
@@ -920,8 +783,7 @@ export default function SessionDetailPage() {
                     {activityLogs.map((log) => (
                       <div
                         key={log._id}
-                        className="flex items-start gap-4 p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
-                        onClick={() => setSelectedActivity(log)}
+                        className="flex items-start gap-4 p-4 border rounded-lg hover:bg-accent/50 transition-colors"
                       >
                         <div className="flex-shrink-0 mt-1">
                           {log.action === "create" && (
@@ -954,55 +816,7 @@ export default function SessionDetailPage() {
         </Tabs>
       </div>
 
-      {/* Activity Details Modal */}
-      <Dialog open={!!selectedActivity} onOpenChange={() => setSelectedActivity(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Activity Details</DialogTitle>
-            <DialogDescription>
-              {selectedActivity?.action.charAt(0).toUpperCase() + selectedActivity?.action.slice(1)}{" "}
-              {selectedActivity?.entityType}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-muted-foreground">Performed By</p>
-                <p className="font-medium">{selectedActivity?.performedBy?.fullName || "Unknown"}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Time</p>
-                <p className="font-medium">
-                  {selectedActivity && new Date(selectedActivity.timestamp).toLocaleString()}
-                </p>
-              </div>
-            </div>
-
-            {selectedActivity && getChangeDetails(selectedActivity) && (
-              <div className="border rounded-lg overflow-hidden">
-                <div className="bg-muted px-4 py-2 font-medium text-sm">Changes</div>
-                <div className="divide-y">
-                  {getChangeDetails(selectedActivity).map((change, idx) => (
-                    <div key={idx} className="grid grid-cols-3 gap-4 px-4 py-3 text-sm">
-                      <div className="font-medium">{change.field}</div>
-                      <div className="text-muted-foreground">
-                        {selectedActivity.action !== "create" && (
-                          <span className="line-through">{change.before}</span>
-                        )}
-                      </div>
-                      <div className="text-green-600 font-medium">
-                        {selectedActivity.action !== "delete" && change.after}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Other Dialogs */}
+      {/* Dialogs */}
       <Dialog open={isDuplicateOpen} onOpenChange={setIsDuplicateOpen}>
         <DialogContent>
           <DialogHeader>

@@ -423,17 +423,23 @@ export default function FeatureDetailPage() {
               </Select>
             </div>
 
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setIsAIGenerateOpen(true)}>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <Button
+                variant="outline"
+                onClick={() => setIsAIGenerateOpen(true)}
+                className="w-full sm:w-auto"
+              >
                 <Sparkles className="mr-2 h-4 w-4" />
-                Generate with AI
+                <span className="hidden sm:inline">Generate with AI</span>
+                <span className="sm:hidden">AI Generate</span>
               </Button>
 
               <Dialog open={isBulkImportOpen} onOpenChange={setIsBulkImportOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline">
+                  <Button variant="outline" className="w-full sm:w-auto">
                     <Upload className="mr-2 h-4 w-4" />
-                    Bulk Import
+                    <span className="hidden sm:inline">Bulk Import</span>
+                    <span className="sm:hidden">Import</span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl h-[90vh] flex flex-col p-0">
@@ -495,9 +501,10 @@ export default function FeatureDetailPage() {
 
               <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                 <DialogTrigger asChild>
-                  <Button>
+                  <Button className="w-full sm:w-auto">
                     <Plus className="mr-2 h-4 w-4" />
-                    Add Test Case
+                    <span className="hidden sm:inline">Add Test Case</span>
+                    <span className="sm:hidden">Add Case</span>
                   </Button>
                 </DialogTrigger>
               <DialogContent>

@@ -150,7 +150,7 @@ export function AIGenerateDialog({ open, onOpenChange, onImport, featureId }) {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-purple-500" />
@@ -258,7 +258,7 @@ export function AIGenerateDialog({ open, onOpenChange, onImport, featureId }) {
                     key={index}
                     className="border rounded-lg p-3 space-y-2 bg-card"
                   >
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                       <div className="flex-1 space-y-2">
                         {editingIndex === index ? (
                           <>
@@ -295,18 +295,18 @@ export function AIGenerateDialog({ open, onOpenChange, onImport, featureId }) {
                           </>
                         ) : (
                           <>
-                            <h4 className="font-medium">{testCase.title}</h4>
-                            <p className="text-sm text-muted-foreground">
+                            <h4 className="font-medium break-words">{testCase.title}</h4>
+                            <p className="text-sm text-muted-foreground break-words">
                               <strong>Steps:</strong> {testCase.note}
                             </p>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-sm text-muted-foreground break-words">
                               <strong>Expected:</strong>{" "}
                               {testCase.expectedOutput}
                             </p>
                           </>
                         )}
                       </div>
-                      <div className="flex gap-1">
+                      <div className="flex gap-1 self-end sm:self-start">
                         <Button
                           variant="ghost"
                           size="icon"
@@ -315,6 +315,7 @@ export function AIGenerateDialog({ open, onOpenChange, onImport, featureId }) {
                               editingIndex === index ? null : index
                             )
                           }
+                          className="h-9 w-9 sm:h-8 sm:w-8"
                         >
                           <Edit3 className="h-4 w-4" />
                         </Button>
@@ -322,6 +323,7 @@ export function AIGenerateDialog({ open, onOpenChange, onImport, featureId }) {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleDelete(index)}
+                          className="h-9 w-9 sm:h-8 sm:w-8"
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -334,12 +336,12 @@ export function AIGenerateDialog({ open, onOpenChange, onImport, featureId }) {
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          <Button variant="outline" onClick={handleClose} className="w-full sm:w-auto">
             Cancel
           </Button>
           {generatedCases.length > 0 && (
-            <Button onClick={handleImport} disabled={isImporting}>
+            <Button onClick={handleImport} disabled={isImporting} className="w-full sm:w-auto">
               {isImporting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
