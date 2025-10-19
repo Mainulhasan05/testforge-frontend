@@ -55,6 +55,7 @@ import {
   Edit,
   Upload,
   Copy,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
@@ -74,6 +75,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { AIGenerateDialog } from "@/components/cases/ai-generate-dialog";
 
 export default function FeatureDetailPage() {
   const params = useParams();
@@ -114,6 +116,7 @@ export default function FeatureDetailPage() {
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [bulkJsonData, setBulkJsonData] = useState("");
   const [isBulkCreating, setIsBulkCreating] = useState(false);
+  const [isAIGenerateOpen, setIsAIGenerateOpen] = useState(false);
 
   const bulkImportTemplate = JSON.stringify([
     {
@@ -342,6 +345,16 @@ export default function FeatureDetailPage() {
     }
   };
 
+  const handleAIImport = async (generatedCases) => {
+    try {
+      await realApi.cases.bulkCreate(featureId, generatedCases);
+      dispatch(fetchCases({ featureId, params: { page: 1, limit: 10 } }));
+    } catch (err) {
+      console.error("Failed to import AI generated cases:", err);
+      throw err;
+    }
+  };
+
   if (!currentFeature) {
     return (
       <AppLayout>
@@ -411,6 +424,11 @@ export default function FeatureDetailPage() {
             </div>
 
             <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setIsAIGenerateOpen(true)}>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Generate with AI
+              </Button>
+
               <Dialog open={isBulkImportOpen} onOpenChange={setIsBulkImportOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline">
@@ -930,6 +948,13 @@ export default function FeatureDetailPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <AIGenerateDialog
+        open={isAIGenerateOpen}
+        onOpenChange={setIsAIGenerateOpen}
+        onImport={handleAIImport}
+        featureId={featureId}
+      />
     </AppLayout>
   );
 }

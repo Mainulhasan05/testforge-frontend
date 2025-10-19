@@ -42,13 +42,76 @@ export function useBreadcrumbs(customCrumbs = null) {
       } else if (prevSegment === "sessions" && currentSession && currentSession._id === segment) {
         label = currentSession.title
       } else if (prevSegment === "features" && currentFeature && currentFeature._id === segment) {
+        // For features, build proper hierarchy: Org > Session > Feature
         label = currentFeature.title
+
+        // If we have session and org data, rebuild breadcrumbs with proper hierarchy
+        if (currentFeature.sessionId) {
+          const session = currentFeature.sessionId
+          const org = session.orgId
+
+          // Clear previous breadcrumbs and rebuild with hierarchy
+          breadcrumbs.length = 1 // Keep only Home
+
+          if (org && org._id) {
+            breadcrumbs.push({
+              label: org.name,
+              href: `/orgs/${org._id}`
+            })
+          }
+
+          if (session._id) {
+            breadcrumbs.push({
+              label: session.title,
+              href: `/sessions/${session._id}`
+            })
+          }
+        }
       } else if (prevSegment === "cases" && currentCase && currentCase._id === segment) {
+        // For cases, build proper hierarchy: Org > Session > Feature > Case
         label = currentCase.title
+
+        // If we have feature, session, and org data, rebuild breadcrumbs with proper hierarchy
+        if (currentCase.featureId) {
+          const feature = currentCase.featureId
+
+          breadcrumbs.length = 1 // Keep only Home
+
+          if (feature.sessionId) {
+            const session = feature.sessionId
+            const org = session.orgId
+
+            if (org && org._id) {
+              breadcrumbs.push({
+                label: org.name,
+                href: `/orgs/${org._id}`
+              })
+            }
+
+            if (session._id) {
+              breadcrumbs.push({
+                label: session.title,
+                href: `/sessions/${session._id}`
+              })
+            }
+          }
+
+          if (feature._id) {
+            breadcrumbs.push({
+              label: feature.title,
+              href: `/features/${feature._id}`
+            })
+          }
+        }
       }
 
       breadcrumbs.push({ label, href: path })
     } else {
+      // Skip adding "features" and "cases" as standalone breadcrumbs since they don't have their own pages
+      if (segment === "features" || segment === "cases") {
+        continue
+      }
+
       // Convert segment to readable label
       const label = segment
         .split("-")
