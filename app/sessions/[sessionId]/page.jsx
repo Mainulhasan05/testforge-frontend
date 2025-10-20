@@ -58,6 +58,7 @@ import {
   ChevronDown,
   ChevronUp,
   FileText,
+  Filter,
 } from "lucide-react";
 import { toast } from "sonner";
 import { realApi } from "@/lib/realApi";
@@ -102,6 +103,8 @@ export default function SessionDetailPage() {
   const [resultsData, setResultsData] = useState(null);
   const [loadingResults, setLoadingResults] = useState(false);
   const [selectedCaseDetail, setSelectedCaseDetail] = useState(null);
+  const [selectedTesters, setSelectedTesters] = useState([]);
+  const [selectedStatuses, setSelectedStatuses] = useState([]);
   const [isCreateFeatureOpen, setIsCreateFeatureOpen] = useState(false);
   const [featureFormData, setFeatureFormData] = useState({ title: "", description: "", sortOrder: "" });
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -128,6 +131,13 @@ export default function SessionDetailPage() {
       dispatch(fetchOrgMembers(currentSession.orgId._id));
     }
   }, [dispatch, currentSession?.orgId?._id]);
+
+  // Refetch results when filters change
+  useEffect(() => {
+    if (resultsData && (selectedTesters.length > 0 || selectedStatuses.length > 0)) {
+      fetchResults();
+    }
+  }, [selectedTesters, selectedStatuses]);
 
   const fetchDashboard = async () => {
     setLoadingDashboard(true);
@@ -160,15 +170,49 @@ export default function SessionDetailPage() {
   const fetchResults = async () => {
     setLoadingResults(true);
     try {
-      const response = await realApi.sessions.getDashboard(sessionId);
+      const filters = {
+        testerIds: selectedTesters,
+        status: selectedStatuses,
+      };
+      const response = await realApi.sessions.getTestResults(sessionId, filters);
       if (response.success) {
         setResultsData(response.data);
+        // Initialize filters with all testers selected on first load
+        if (selectedTesters.length === 0 && response.data.session.assignees) {
+          setSelectedTesters(response.data.session.assignees.map(t => t._id));
+        }
       }
     } catch (error) {
       console.error("Failed to fetch results:", error);
     } finally {
       setLoadingResults(false);
     }
+  };
+
+  const toggleTester = (testerId) => {
+    setSelectedTesters(prev =>
+      prev.includes(testerId)
+        ? prev.filter(id => id !== testerId)
+        : [...prev, testerId]
+    );
+  };
+
+  const toggleStatus = (status) => {
+    setSelectedStatuses(prev =>
+      prev.includes(status)
+        ? prev.filter(s => s !== status)
+        : [...prev, status]
+    );
+  };
+
+  const selectAllTesters = () => {
+    if (resultsData?.session?.assignees) {
+      setSelectedTesters(resultsData.session.assignees.map(t => t._id));
+    }
+  };
+
+  const clearAllTesters = () => {
+    setSelectedTesters([]);
   };
 
   const handleDuplicate = async () => {
@@ -973,8 +1017,76 @@ export default function SessionDetailPage() {
             </Card>
           </TabsContent>
 
-          {/* Results Tab - Detailed Test Case Results */}
-          <TabsContent value="results" className="mt-6">
+          {/* Results Tab - All Testers' Test Results */}
+          <TabsContent value="results" className="mt-6 space-y-4">
+            {/* Filters Section */}
+            {resultsData && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Filter className="h-4 w-4" />
+                    Filters
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Tester Filter */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium">Testers ({selectedTesters.length}/{resultsData.session.assignees.length})</label>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={selectAllTesters}>
+                            All
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={clearAllTesters}>
+                            Clear
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {resultsData.session.assignees.map(tester => (
+                          <Button
+                            key={tester._id}
+                            variant={selectedTesters.includes(tester._id) ? "default" : "outline"}
+                            size="sm"
+                            className="h-8 text-xs"
+                            onClick={() => toggleTester(tester._id)}
+                          >
+                            <Avatar className="h-4 w-4 mr-1.5">
+                              <AvatarFallback className="text-xs">{tester.fullName?.[0] || 'U'}</AvatarFallback>
+                            </Avatar>
+                            <span className="hidden sm:inline">{tester.fullName}</span>
+                            <span className="sm:hidden">{tester.fullName?.[0]}</span>
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Status Filter */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Status ({selectedStatuses.length}/4)</label>
+                      <div className="flex flex-wrap gap-2">
+                        {['passed', 'failed', 'partial', 'untested'].map(status => (
+                          <Button
+                            key={status}
+                            variant={selectedStatuses.includes(status) ? "default" : "outline"}
+                            size="sm"
+                            className="h-8 text-xs capitalize"
+                            onClick={() => toggleStatus(status)}
+                          >
+                            {status === 'passed' && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                            {status === 'failed' && <XCircle className="h-3 w-3 mr-1" />}
+                            {status}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Results Section */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -982,7 +1094,7 @@ export default function SessionDetailPage() {
                   Test Results
                 </CardTitle>
                 <CardDescription>
-                  Detailed results for each test case with tester feedback
+                  View all testers' feedback for each test case
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1007,51 +1119,85 @@ export default function SessionDetailPage() {
                             <Box className="h-4 w-4 text-primary flex-shrink-0" />
                             <h3 className="font-semibold text-base sm:text-lg break-words">{feature.title}</h3>
                           </div>
-                          <Badge variant="outline" className="sm:ml-auto w-fit">
-                            {feature.stats.tested}/{feature.stats.total} tested
-                          </Badge>
+                          <div className="flex gap-2 flex-wrap">
+                            <Badge variant="outline" className="w-fit text-xs">
+                              {feature.stats.passedCases} passed
+                            </Badge>
+                            <Badge variant="outline" className="w-fit text-xs">
+                              {feature.stats.failedCases} failed
+                            </Badge>
+                            <Badge variant="outline" className="w-fit text-xs">
+                              {feature.stats.untestedCases} untested
+                            </Badge>
+                          </div>
                         </div>
 
                         {!feature.cases || feature.cases.length === 0 ? (
-                          <p className="text-sm text-muted-foreground pl-4 sm:pl-6">No test cases in this feature</p>
+                          <p className="text-sm text-muted-foreground pl-4 sm:pl-6">No test cases match filters</p>
                         ) : (
                           <div className="space-y-2 sm:space-y-3">
                             {feature.cases.map((testCase) => {
-                              const hasFeedback = testCase.userFeedback;
-                              const imageCounts = 0; // TODO: Fetch image count
+                              const borderLeftColor =
+                                testCase.overallStatus === 'passed' ? 'rgb(34 197 94)' :
+                                testCase.overallStatus === 'failed' ? 'rgb(239 68 68)' :
+                                testCase.overallStatus === 'partial' ? 'rgb(251 191 36)' :
+                                'rgb(148 163 184 / 0.3)';
+
                               return (
                                 <Card
                                   key={testCase._id}
                                   className="border-l-4 cursor-pointer hover:shadow-md transition-shadow"
-                                  style={{
-                                    borderLeftColor: hasFeedback
-                                      ? (testCase.userFeedback.result === 'pass' ? 'rgb(34 197 94)' : 'rgb(239 68 68)')
-                                      : 'rgb(148 163 184 / 0.3)'
-                                  }}
+                                  style={{ borderLeftColor }}
                                   onClick={() => setSelectedCaseDetail(testCase)}
                                 >
                                   <CardContent className="p-3 sm:p-4">
-                                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-4">
-                                      <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                          <h4 className="font-medium text-sm sm:text-base break-words">{testCase.title}</h4>
-                                          {hasFeedback && (
-                                            <Badge
-                                              variant={testCase.userFeedback.result === 'pass' ? 'default' : 'destructive'}
-                                              className="text-xs flex-shrink-0"
-                                            >
-                                              {testCase.userFeedback.result === 'pass' ? <CheckCircle2 className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
-                                              {testCase.userFeedback.result}
-                                            </Badge>
+                                    <div className="flex flex-col gap-3">
+                                      {/* Title Row */}
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="flex-1 min-w-0">
+                                          <h4 className="font-medium text-sm sm:text-base break-words mb-1">{testCase.title}</h4>
+                                          {testCase.note && (
+                                            <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1">{testCase.note}</p>
                                           )}
                                         </div>
-                                        {testCase.note && (
-                                          <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1">{testCase.note}</p>
-                                        )}
+                                        <Badge variant="outline" className="text-xs capitalize flex-shrink-0">
+                                          {testCase.overallStatus}
+                                        </Badge>
                                       </div>
-                                      <Button variant="ghost" size="sm" className="text-xs w-full sm:w-auto">
-                                        View Details
-                                      </Button>
+
+                                      {/* Tester Summary */}
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                          <Users className="h-3 w-3" />
+                                          <span>{testCase.stats.testedCount}/{testCase.stats.totalTesters} tested</span>
+                                        </div>
+                                        {testCase.stats.passCount > 0 && (
+                                          <Badge variant="default" className="text-xs h-5 bg-green-600">
+                                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                                            {testCase.stats.passCount}
+                                          </Badge>
+                                        )}
+                                        {testCase.stats.failCount > 0 && (
+                                          <Badge variant="destructive" className="text-xs h-5">
+                                            <XCircle className="h-3 w-3 mr-1" />
+                                            {testCase.stats.failCount}
+                                          </Badge>
+                                        )}
+
+                                        {/* Tester Avatars */}
+                                        <div className="flex -space-x-2 ml-auto">
+                                          {testCase.feedback.slice(0, 3).map((fb, idx) => (
+                                            <Avatar key={idx} className="h-6 w-6 border-2 border-background">
+                                              <AvatarFallback className="text-xs">{fb.testerName?.[0] || 'U'}</AvatarFallback>
+                                            </Avatar>
+                                          ))}
+                                          {testCase.feedback.length > 3 && (
+                                            <div className="h-6 w-6 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs">
+                                              +{testCase.feedback.length - 3}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
                                     </div>
                                   </CardContent>
                                 </Card>
@@ -1230,39 +1376,56 @@ export default function SessionDetailPage() {
               )}
             </div>
 
-            {/* Tester Feedback */}
+            {/* All Testers' Feedback */}
             <div className="border-t pt-4">
-              <h4 className="font-semibold text-base sm:text-lg mb-3 sm:mb-4">Your Feedback</h4>
+              <h4 className="font-semibold text-base sm:text-lg mb-3 sm:mb-4">
+                All Testers' Feedback ({selectedCaseDetail?.feedback?.length || 0}/{selectedCaseDetail?.stats?.totalTesters || 0})
+              </h4>
 
-              {selectedCaseDetail?.userFeedback ? (
+              {selectedCaseDetail?.feedback && selectedCaseDetail.feedback.length > 0 ? (
                 <div className="space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-3 sm:p-4 border rounded-lg bg-muted/30">
-                    <Badge
-                      variant={selectedCaseDetail.userFeedback.result === 'pass' ? 'default' : 'destructive'}
-                      className="text-xs sm:text-sm w-fit"
-                    >
-                      {selectedCaseDetail.userFeedback.result === 'pass' ? (
-                        <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                      ) : (
-                        <XCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                      )}
-                      {selectedCaseDetail.userFeedback.result}
-                    </Badge>
-                    <p className="text-xs text-muted-foreground">
-                      Submitted on {new Date(selectedCaseDetail.userFeedback.createdAt).toLocaleString()}
-                    </p>
-                  </div>
+                  {selectedCaseDetail.feedback.map((fb, idx) => (
+                    <div key={idx} className="border rounded-lg overflow-hidden">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-3 sm:p-4 bg-muted/30">
+                        <div className="flex items-center gap-2 flex-1">
+                          <Avatar className="h-8 w-8 sm:h-10 sm:w-10">
+                            <AvatarFallback className="text-xs sm:text-sm">
+                              {fb.testerName?.[0] || 'U'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium text-sm sm:text-base">{fb.testerName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(fb.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge
+                          variant={fb.result === 'pass' ? 'default' : 'destructive'}
+                          className="text-xs sm:text-sm w-fit"
+                        >
+                          {fb.result === 'pass' ? (
+                            <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                          ) : (
+                            <XCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                          )}
+                          {fb.result}
+                        </Badge>
+                      </div>
 
-                  {selectedCaseDetail.userFeedback.comment && (
-                    <div className="p-3 sm:p-4 bg-muted/50 rounded-md border">
-                      <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-2">Comment</p>
-                      <p className="text-sm sm:text-base break-words whitespace-pre-wrap">{selectedCaseDetail.userFeedback.comment}</p>
+                      {fb.comment && (
+                        <div className="p-3 sm:p-4 bg-background border-t">
+                          <p className="text-sm sm:text-base break-words whitespace-pre-wrap text-muted-foreground">
+                            {fb.comment}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  ))}
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground py-6 text-center">
-                  No feedback submitted yet
+                  No tester feedback yet
                 </p>
               )}
             </div>
