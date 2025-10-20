@@ -13,7 +13,7 @@ import { createFeature, fetchFeatures } from "@/lib/slices/featuresSlice";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Dialog,
@@ -99,6 +99,9 @@ export default function SessionDetailPage() {
   const [duplicating, setDuplicating] = useState(false);
   const [dashboardData, setDashboardData] = useState(null);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
+  const [resultsData, setResultsData] = useState(null);
+  const [loadingResults, setLoadingResults] = useState(false);
+  const [selectedCaseDetail, setSelectedCaseDetail] = useState(null);
   const [isCreateFeatureOpen, setIsCreateFeatureOpen] = useState(false);
   const [featureFormData, setFeatureFormData] = useState({ title: "", description: "", sortOrder: "" });
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -129,7 +132,7 @@ export default function SessionDetailPage() {
   const fetchDashboard = async () => {
     setLoadingDashboard(true);
     try {
-      const response = await realApi.sessions.getDashboard(sessionId);
+      const response = await realApi.sessions.getFeatureStatistics(sessionId);
       if (response.success) {
         setDashboardData(response.data);
       }
@@ -151,6 +154,20 @@ export default function SessionDetailPage() {
       console.error("Failed to fetch activity:", error);
     } finally {
       setLoadingActivity(false);
+    }
+  };
+
+  const fetchResults = async () => {
+    setLoadingResults(true);
+    try {
+      const response = await realApi.sessions.getDashboard(sessionId);
+      if (response.success) {
+        setResultsData(response.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch results:", error);
+    } finally {
+      setLoadingResults(false);
     }
   };
 
@@ -529,7 +546,7 @@ export default function SessionDetailPage() {
 
         {/* Main Tabs */}
         <Tabs defaultValue="features" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 max-w-[600px]">
+          <TabsList className="grid w-full grid-cols-5 max-w-[750px]">
             <TabsTrigger value="features" className="gap-2">
               <Box className="h-4 w-4" />
               <span className="hidden sm:inline">Features</span>
@@ -545,6 +562,10 @@ export default function SessionDetailPage() {
             <TabsTrigger value="activity" onClick={fetchActivity} className="gap-2">
               <Activity className="h-4 w-4" />
               <span className="hidden sm:inline">Activity</span>
+            </TabsTrigger>
+            <TabsTrigger value="results" onClick={fetchResults} className="gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Results</span>
             </TabsTrigger>
           </TabsList>
 
@@ -951,6 +972,100 @@ export default function SessionDetailPage() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Results Tab - Detailed Test Case Results */}
+          <TabsContent value="results" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5" />
+                  Test Results
+                </CardTitle>
+                <CardDescription>
+                  Detailed results for each test case with tester feedback
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingResults ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3, 4].map((i) => (
+                      <Skeleton key={i} className="h-32 w-full" />
+                    ))}
+                  </div>
+                ) : !resultsData || !resultsData.features || resultsData.features.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <CheckCircle2 className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                    <p className="text-base font-medium">No test results yet</p>
+                    <p className="text-sm mt-1">Test cases will appear here once testers submit feedback</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {resultsData.features.map((feature) => (
+                      <div key={feature._id} className="space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 pb-2 border-b">
+                          <div className="flex items-center gap-2">
+                            <Box className="h-4 w-4 text-primary flex-shrink-0" />
+                            <h3 className="font-semibold text-base sm:text-lg break-words">{feature.title}</h3>
+                          </div>
+                          <Badge variant="outline" className="sm:ml-auto w-fit">
+                            {feature.stats.tested}/{feature.stats.total} tested
+                          </Badge>
+                        </div>
+
+                        {!feature.cases || feature.cases.length === 0 ? (
+                          <p className="text-sm text-muted-foreground pl-4 sm:pl-6">No test cases in this feature</p>
+                        ) : (
+                          <div className="space-y-2 sm:space-y-3">
+                            {feature.cases.map((testCase) => {
+                              const hasFeedback = testCase.userFeedback;
+                              const imageCounts = 0; // TODO: Fetch image count
+                              return (
+                                <Card
+                                  key={testCase._id}
+                                  className="border-l-4 cursor-pointer hover:shadow-md transition-shadow"
+                                  style={{
+                                    borderLeftColor: hasFeedback
+                                      ? (testCase.userFeedback.result === 'pass' ? 'rgb(34 197 94)' : 'rgb(239 68 68)')
+                                      : 'rgb(148 163 184 / 0.3)'
+                                  }}
+                                  onClick={() => setSelectedCaseDetail(testCase)}
+                                >
+                                  <CardContent className="p-3 sm:p-4">
+                                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-4">
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                          <h4 className="font-medium text-sm sm:text-base break-words">{testCase.title}</h4>
+                                          {hasFeedback && (
+                                            <Badge
+                                              variant={testCase.userFeedback.result === 'pass' ? 'default' : 'destructive'}
+                                              className="text-xs flex-shrink-0"
+                                            >
+                                              {testCase.userFeedback.result === 'pass' ? <CheckCircle2 className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
+                                              {testCase.userFeedback.result}
+                                            </Badge>
+                                          )}
+                                        </div>
+                                        {testCase.note && (
+                                          <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1">{testCase.note}</p>
+                                        )}
+                                      </div>
+                                      <Button variant="ghost" size="sm" className="text-xs w-full sm:w-auto">
+                                        View Details
+                                      </Button>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -1084,6 +1199,74 @@ export default function SessionDetailPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Test Case Detail Modal */}
+      <Dialog open={!!selectedCaseDetail} onOpenChange={() => setSelectedCaseDetail(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg sm:text-xl break-words pr-6">{selectedCaseDetail?.title}</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
+              Test case details and tester feedback
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 sm:space-y-6 py-4">
+            {/* Test Case Info */}
+            <div className="space-y-3 sm:space-y-4">
+              {selectedCaseDetail?.note && (
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">Steps</p>
+                  <p className="text-sm sm:text-base bg-muted/50 p-3 rounded-md break-words">{selectedCaseDetail.note}</p>
+                </div>
+              )}
+
+              {selectedCaseDetail?.expectedOutput && (
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">Expected Output</p>
+                  <p className="text-sm sm:text-base bg-muted/50 p-3 rounded-md break-words">{selectedCaseDetail.expectedOutput}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Tester Feedback */}
+            <div className="border-t pt-4">
+              <h4 className="font-semibold text-base sm:text-lg mb-3 sm:mb-4">Your Feedback</h4>
+
+              {selectedCaseDetail?.userFeedback ? (
+                <div className="space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-3 sm:p-4 border rounded-lg bg-muted/30">
+                    <Badge
+                      variant={selectedCaseDetail.userFeedback.result === 'pass' ? 'default' : 'destructive'}
+                      className="text-xs sm:text-sm w-fit"
+                    >
+                      {selectedCaseDetail.userFeedback.result === 'pass' ? (
+                        <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                      ) : (
+                        <XCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                      )}
+                      {selectedCaseDetail.userFeedback.result}
+                    </Badge>
+                    <p className="text-xs text-muted-foreground">
+                      Submitted on {new Date(selectedCaseDetail.userFeedback.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+
+                  {selectedCaseDetail.userFeedback.comment && (
+                    <div className="p-3 sm:p-4 bg-muted/50 rounded-md border">
+                      <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-2">Comment</p>
+                      <p className="text-sm sm:text-base break-words whitespace-pre-wrap">{selectedCaseDetail.userFeedback.comment}</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  No feedback submitted yet
+                </p>
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </AppLayout>

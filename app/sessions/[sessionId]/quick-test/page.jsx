@@ -70,6 +70,7 @@ export default function QuickTestPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [expandedFeatures, setExpandedFeatures] = useState([]);
   const [expandedImageUploads, setExpandedImageUploads] = useState({});
+  const [imageCounts, setImageCounts] = useState({});
 
   // Refs for scroll position preservation
   const scrollPositionRef = useRef(0);
@@ -477,6 +478,12 @@ export default function QuickTestPage() {
                                       {isTested && <Badge variant={getStatusColor(myFeedback.result)} className="flex items-center gap-1 flex-shrink-0">
                                         {getStatusIcon(myFeedback.result)}{myFeedback.result}
                                       </Badge>}
+                                      {imageCounts[testCase._id] > 0 && (
+                                        <Badge variant="outline" className="flex items-center gap-1 flex-shrink-0 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+                                          <ImageIcon className="h-3 w-3" />
+                                          {imageCounts[testCase._id]}
+                                        </Badge>
+                                      )}
                                     </div>
                                     {testCase.note && <p className="text-sm text-muted-foreground mb-1 break-words"><span className="font-medium">Steps:</span> {testCase.note}</p>}
                                     {testCase.expectedOutput && <p className="text-sm text-muted-foreground mb-1 break-words"><span className="font-medium">Expected:</span> {testCase.expectedOutput}</p>}
@@ -513,6 +520,12 @@ export default function QuickTestPage() {
                                             maxFiles={5}
                                             onUploadSuccess={(uploadedImages) => {
                                               toast.success(`${uploadedImages.length} image(s) uploaded`);
+                                            }}
+                                            onImagesLoaded={(loadedImages) => {
+                                              setImageCounts(prev => ({
+                                                ...prev,
+                                                [testCase._id]: loadedImages.length
+                                              }));
                                             }}
                                             existingImages={[]}
                                             className="w-full"
