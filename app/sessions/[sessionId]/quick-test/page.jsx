@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/select";
 import { DynamicBreadcrumb } from "@/components/ui/dynamic-breadcrumb";
 import AppLayout from "@/components/layout/app-layout";
+import ImageUpload from "@/components/common/ImageUpload";
 import {
   CheckCircle2,
   XCircle,
@@ -47,6 +48,9 @@ import {
   Filter,
   BarChart3,
   Edit,
+  ImageIcon,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { realApi } from "@/lib/realApi";
@@ -65,6 +69,7 @@ export default function QuickTestPage() {
   const [selectedResult, setSelectedResult] = useState("pass");
   const [statusFilter, setStatusFilter] = useState("all");
   const [expandedFeatures, setExpandedFeatures] = useState([]);
+  const [expandedImageUploads, setExpandedImageUploads] = useState({});
 
   // Refs for scroll position preservation
   const scrollPositionRef = useRef(0);
@@ -118,10 +123,10 @@ export default function QuickTestPage() {
       }
 
       const response = await realApi.sessions.getDashboard(sessionId);
-      setDashboardData(response.data);
+      setDashboardData(response?.data || null);
 
       // Only set default expanded state on first load
-      if (!dashboardData && response.data.features.length > 0) {
+      if (!dashboardData && response.data?.features?.length > 0) {
         const savedState = sessionStorage.getItem(`quickTest_${sessionId}`);
         if (!savedState) {
           setExpandedFeatures([response.data.features[0]._id]);
@@ -194,10 +199,10 @@ export default function QuickTestPage() {
     saveUIState();
 
     // Optimistic update - update local state immediately
-    if (dashboardData) {
-      const updatedFeatures = dashboardData.features.map(feature => ({
+    if (dashboardData && dashboardData.features) {
+      const updatedFeatures = (dashboardData.features || []).map(feature => ({
         ...feature,
-        cases: feature.cases.map(testCase => {
+        cases: (feature.cases || []).map(testCase => {
           if (testCase._id === caseId) {
             const updatedFeedback = isUpdate && testCase.userFeedback
               ? { ...testCase.userFeedback, result, comment: feedbackComment || `Marked as ${result}` }
@@ -272,6 +277,9 @@ export default function QuickTestPage() {
   };
 
   const getFilteredCases = (cases) => {
+    // Ensure cases is always an array
+    if (!Array.isArray(cases)) return [];
+
     if (statusFilter === "all") return cases;
     if (statusFilter === "tested") return cases.filter((c) => c.userFeedback);
     if (statusFilter === "untested") return cases.filter((c) => !c.userFeedback);
@@ -303,12 +311,41 @@ export default function QuickTestPage() {
     );
   }
 
-  const { session, features, stats } = dashboardData;
+  // Destructure with safe defaults
+  const {
+    session,
+    features = [],
+    stats = {},
+    progress = {}
+  } = dashboardData || {};
+
+  // Ensure stats has default values
+  const safeStats = {
+    progressPercentage: stats?.progressPercentage || 0,
+    passedCases: stats?.passedCases || 0,
+    failedCases: stats?.failedCases || 0,
+    untestedCases: stats?.untestedCases || 0,
+    totalCases: stats?.totalCases || 0,
+    totalFeatures: stats?.totalFeatures || 0,
+    testedCases: stats?.testedCases || 0,
+  };
+
+  // Ensure all features have safe defaults for cases and stats
+  const safeFeatures = (features || []).map(feature => ({
+    ...feature,
+    cases: Array.isArray(feature.cases) ? feature.cases : [],
+    stats: {
+      total: feature.stats?.total || 0,
+      tested: feature.stats?.tested || 0,
+      passed: feature.stats?.passed || 0,
+      failed: feature.stats?.failed || 0,
+    },
+  }));
 
   const breadcrumbItems = session?.orgId?._id
     ? [
         { label: session.orgId.name || "Organization", href: `/orgs/${session.orgId._id}` },
-        { label: session.title, href: `/sessions/${sessionId}` },
+        { label: session.title || "Session", href: `/sessions/${sessionId}` },
         { label: "Quick Test Mode" }
       ]
     : null;
@@ -323,7 +360,7 @@ export default function QuickTestPage() {
           </div>
           <div className="flex-1 min-w-0">
             <h1 className="text-2xl font-bold">Quick Test Mode</h1>
-            <p className="text-sm text-muted-foreground break-words">{session.title}</p>
+            <p className="text-sm text-muted-foreground break-words">{session?.title || "Test Session"}</p>
           </div>
         </div>
 
@@ -334,30 +371,30 @@ export default function QuickTestPage() {
                 <CardTitle className="text-foreground">Your Testing Progress</CardTitle>
                 <CardDescription>Click Pass/Fail to submit. Click again to update.</CardDescription>
               </div>
-              <Badge variant="outline" className="text-lg px-4 py-2 bg-background">{stats.progressPercentage}% Complete</Badge>
+              <Badge variant="outline" className="text-lg px-4 py-2 bg-background">{safeStats.progressPercentage}% Complete</Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-4 pt-6">
-            <Progress value={stats.progressPercentage} className="h-3" />
+            <Progress value={safeStats.progressPercentage} className="h-3" />
             <div className="grid grid-cols-3 gap-4">
               <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200/50 dark:border-green-800/30">
                 <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-500" />
                 <div>
-                  <p className="text-2xl font-bold text-green-700 dark:text-green-400">{stats.passedCases}</p>
+                  <p className="text-2xl font-bold text-green-700 dark:text-green-400">{safeStats.passedCases}</p>
                   <p className="text-xs text-green-600/70 dark:text-green-500/70">Passed</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200/50 dark:border-red-800/30">
                 <XCircle className="h-6 w-6 text-red-600 dark:text-red-500" />
                 <div>
-                  <p className="text-2xl font-bold text-red-700 dark:text-red-400">{stats.failedCases}</p>
+                  <p className="text-2xl font-bold text-red-700 dark:text-red-400">{safeStats.failedCases}</p>
                   <p className="text-xs text-red-600/70 dark:text-red-500/70">Failed</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-900/30 border border-slate-200/50 dark:border-slate-700/30">
                 <Clock className="h-6 w-6 text-slate-600 dark:text-slate-400" />
                 <div>
-                  <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{stats.untestedCases}</p>
+                  <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{safeStats.untestedCases}</p>
                   <p className="text-xs text-slate-600/70 dark:text-slate-400/70">Untested</p>
                 </div>
               </div>
@@ -380,17 +417,17 @@ export default function QuickTestPage() {
             </Select>
           </div>
           <Button variant="outline" size="sm" onClick={() => {
-            if (expandedFeatures.length === features.length) {
+            if (expandedFeatures.length === safeFeatures.length) {
               setExpandedFeatures([]);
             } else {
-              setExpandedFeatures(features.map((f) => f._id));
+              setExpandedFeatures(safeFeatures.map((f) => f._id));
             }
           }}>
-            {expandedFeatures.length === features.length ? "Collapse All" : "Expand All"}
+            {expandedFeatures.length === safeFeatures.length ? "Collapse All" : "Expand All"}
           </Button>
         </div>
 
-        {features.length === 0 ? (
+        {safeFeatures.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <BarChart3 className="h-12 w-12 text-muted-foreground mb-4" />
@@ -400,8 +437,8 @@ export default function QuickTestPage() {
           </Card>
         ) : (
           <Accordion type="multiple" value={expandedFeatures} onValueChange={setExpandedFeatures} className="space-y-4">
-            {features.map((feature) => {
-              const filteredCases = getFilteredCases(feature.cases);
+            {safeFeatures.map((feature) => {
+              const filteredCases = getFilteredCases(feature.cases || []);
               return (
                 <AccordionItem key={feature._id} value={feature._id} className="border border-border/50 rounded-lg shadow-sm bg-card">
                   <AccordionTrigger className="px-6 hover:no-underline hover:bg-muted/30 transition-colors rounded-t-lg">
@@ -444,6 +481,45 @@ export default function QuickTestPage() {
                                     {testCase.note && <p className="text-sm text-muted-foreground mb-1 break-words"><span className="font-medium">Steps:</span> {testCase.note}</p>}
                                     {testCase.expectedOutput && <p className="text-sm text-muted-foreground mb-1 break-words"><span className="font-medium">Expected:</span> {testCase.expectedOutput}</p>}
                                     {isTested && myFeedback.comment && <p className="text-sm text-foreground/80 mt-3 p-3 bg-muted/50 rounded-md border border-border/30 break-words"><span className="font-medium">Your comment:</span> {myFeedback.comment}</p>}
+
+                                    {/* Image Upload Toggle Button */}
+                                    <div className="mt-3">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                                        onClick={() => setExpandedImageUploads(prev => ({
+                                          ...prev,
+                                          [testCase._id]: !prev[testCase._id]
+                                        }))}
+                                      >
+                                        <ImageIcon className="mr-1.5 h-3.5 w-3.5" />
+                                        {expandedImageUploads[testCase._id] ? 'Hide' : 'Add'} Images (optional)
+                                        {expandedImageUploads[testCase._id] ?
+                                          <ChevronUp className="ml-1.5 h-3.5 w-3.5" /> :
+                                          <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
+                                        }
+                                      </Button>
+
+                                      {/* Collapsible Image Upload Section */}
+                                      {expandedImageUploads[testCase._id] && (
+                                        <div className="mt-2 p-3 bg-muted/30 rounded-md border border-border/30">
+                                          <ImageUpload
+                                            entityType="case"
+                                            entityId={testCase._id}
+                                            orgId={session?.orgId?._id}
+                                            multiple={true}
+                                            maxFiles={5}
+                                            onUploadSuccess={(uploadedImages) => {
+                                              toast.success(`${uploadedImages.length} image(s) uploaded`);
+                                            }}
+                                            existingImages={[]}
+                                            className="w-full"
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                   <div className="flex flex-col gap-2 flex-shrink-0">
                                     <Button size="sm" variant={myFeedback?.result === "pass" ? "default" : "outline"}
