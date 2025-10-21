@@ -12,11 +12,13 @@ import SessionsList from "@/components/sessions/sessions-list";
 import MembersList from "@/components/orgs/members-list";
 import OrgSettings from "@/components/orgs/org-settings";
 import ActivityFeed from "@/components/activity/activity-feed";
-import { Building2 } from "lucide-react";
+import { Building2, AlertCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function OrgDetailPage() {
   const params = useParams();
   const orgId = params.orgId;
+  const router = useRouter();
   const dispatch = useDispatch();
   const { currentOrg, members } = useSelector((state) => state.orgs);
   const [activeTab, setActiveTab] = useState("sessions");
@@ -58,8 +60,12 @@ export default function OrgDetailPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto">
+          <TabsList className="grid w-full grid-cols-5 lg:w-auto">
             <TabsTrigger value="sessions">Sessions</TabsTrigger>
+            <TabsTrigger value="issues">
+              <AlertCircle className="h-4 w-4 mr-2" />
+              Issues
+            </TabsTrigger>
             <TabsTrigger value="members">Members</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
@@ -67,6 +73,11 @@ export default function OrgDetailPage() {
 
           <TabsContent value="sessions" className="space-y-4">
             <SessionsList orgId={orgId} />
+          </TabsContent>
+
+          <TabsContent value="issues" className="space-y-4">
+            {/* Navigate to dedicated issues page */}
+            {activeTab === "issues" && router.push(`/orgs/${orgId}/issues`)}
           </TabsContent>
 
           <TabsContent value="members" className="space-y-4">
