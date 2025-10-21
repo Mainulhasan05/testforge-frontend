@@ -10,6 +10,7 @@ import {
   assignIssue,
   addComment,
   voteOnIssue,
+  removeVote,
   toggleWatch,
   deleteIssue,
 } from '@/lib/slices/issuesSlice';
@@ -86,6 +87,8 @@ export default function IssueDetailPage() {
     try {
       await dispatch(updateStatus({ issueId, status: newStatus })).unwrap();
       toast.success('Status updated successfully');
+      // Refetch to get updated data
+      dispatch(fetchIssueById(issueId));
     } catch (error) {
       toast.error(error || 'Failed to update status');
     }
@@ -99,6 +102,8 @@ export default function IssueDetailPage() {
       await dispatch(addComment({ issueId, text: commentText })).unwrap();
       setCommentText('');
       toast.success('Comment added successfully');
+      // Refetch to get updated comments
+      dispatch(fetchIssueById(issueId));
     } catch (error) {
       toast.error(error || 'Failed to add comment');
     } finally {
@@ -108,8 +113,21 @@ export default function IssueDetailPage() {
 
   const handleVote = async (voteType) => {
     try {
-      await dispatch(voteOnIssue({ issueId, voteType })).unwrap();
-      toast.success('Vote recorded');
+      // Check if user already voted this type - toggle behavior
+      const userVote = issue.votes?.find(v => v.userId?._id === user._id || v.userId === user._id);
+
+      if (userVote && userVote.voteType === voteType) {
+        // Remove vote if clicking same type
+        await dispatch(removeVote(issueId)).unwrap();
+        toast.success('Vote removed');
+      } else {
+        // Add or change vote
+        await dispatch(voteOnIssue({ issueId, voteType })).unwrap();
+        toast.success('Vote recorded');
+      }
+
+      // Refetch to get updated vote stats
+      dispatch(fetchIssueById(issueId));
     } catch (error) {
       toast.error(error || 'Failed to vote');
     }
@@ -168,6 +186,10 @@ export default function IssueDetailPage() {
 
   const isWatching = issue.watchers?.some(w => w._id === user._id);
   const isReporter = issue.reportedBy?._id === user._id;
+
+  // Get user's current vote
+  const userVote = issue.votes?.find(v => v.userId?._id === user._id || v.userId === user._id);
+  const userVoteType = userVote?.voteType;
 
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8 max-w-7xl">
@@ -306,7 +328,7 @@ export default function IssueDetailPage() {
             <h2 className="text-lg font-semibold mb-4">Community Feedback</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               <Button
-                variant="outline"
+                variant={userVoteType === 'confirm' ? 'default' : 'outline'}
                 onClick={() => handleVote('confirm')}
                 className="flex flex-col items-center py-4"
               >
@@ -315,7 +337,7 @@ export default function IssueDetailPage() {
                 <span className="text-sm font-bold">{issue.voteStats?.confirm || 0}</span>
               </Button>
               <Button
-                variant="outline"
+                variant={userVoteType === 'critical' ? 'default' : 'outline'}
                 onClick={() => handleVote('critical')}
                 className="flex flex-col items-center py-4"
               >
@@ -324,7 +346,7 @@ export default function IssueDetailPage() {
                 <span className="text-sm font-bold">{issue.voteStats?.critical || 0}</span>
               </Button>
               <Button
-                variant="outline"
+                variant={userVoteType === 'cannot_reproduce' ? 'default' : 'outline'}
                 onClick={() => handleVote('cannot_reproduce')}
                 className="flex flex-col items-center py-4"
               >
@@ -332,7 +354,7 @@ export default function IssueDetailPage() {
                 <span className="text-sm font-bold">{issue.voteStats?.cannot_reproduce || 0}</span>
               </Button>
               <Button
-                variant="outline"
+                variant={userVoteType === 'needs_info' ? 'default' : 'outline'}
                 onClick={() => handleVote('needs_info')}
                 className="flex flex-col items-center py-4"
               >
@@ -340,6 +362,11 @@ export default function IssueDetailPage() {
                 <span className="text-sm font-bold">{issue.voteStats?.needs_info || 0}</span>
               </Button>
             </div>
+            {userVoteType && (
+              <p className="text-xs text-muted-foreground mt-2 text-center">
+                Click your vote again to remove it
+              </p>
+            )}
           </Card>
         </div>
 
