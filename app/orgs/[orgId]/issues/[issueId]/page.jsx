@@ -13,6 +13,9 @@ import {
   removeVote,
   toggleWatch,
   deleteIssue,
+  createJiraTicket,
+  syncJiraTicket,
+  unlinkJiraTicket,
 } from '@/lib/slices/issuesSlice';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -38,6 +41,8 @@ import {
   Calendar,
   Tag,
   AlertCircle,
+  ExternalLink,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -56,6 +61,8 @@ export default function IssueDetailPage() {
   const [editData, setEditData] = useState({});
   const [commentText, setCommentText] = useState('');
   const [addingComment, setAddingComment] = useState(false);
+  const [creatingJiraTicket, setCreatingJiraTicket] = useState(false);
+  const [syncingJiraTicket, setSyncingJiraTicket] = useState(false);
 
   useEffect(() => {
     if (issueId) {
@@ -168,6 +175,54 @@ export default function IssueDetailPage() {
       router.push(`/orgs/${orgId}/issues`);
     } catch (error) {
       toast.error(error || 'Failed to delete issue');
+    }
+  };
+
+  const handleCreateJiraTicket = async () => {
+    setCreatingJiraTicket(true);
+    try {
+      const ticketData = {
+        summary: issue.title,
+        description: issue.description,
+        priority: issue.priority,
+        issueType: 'Bug',
+      };
+
+      await dispatch(createJiraTicket({ issueId, orgId, ticketData })).unwrap();
+      toast.success('Jira ticket created successfully!');
+      // Refetch to get updated jiraTicket data
+      dispatch(fetchIssueById(issueId));
+    } catch (error) {
+      toast.error(error || 'Failed to create Jira ticket');
+    } finally {
+      setCreatingJiraTicket(false);
+    }
+  };
+
+  const handleSyncJiraTicket = async () => {
+    setSyncingJiraTicket(true);
+    try {
+      await dispatch(syncJiraTicket(issueId)).unwrap();
+      toast.success('Jira ticket synced successfully!');
+      // Refetch to get updated status
+      dispatch(fetchIssueById(issueId));
+    } catch (error) {
+      toast.error(error || 'Failed to sync Jira ticket');
+    } finally {
+      setSyncingJiraTicket(false);
+    }
+  };
+
+  const handleUnlinkJiraTicket = async () => {
+    if (!confirm('Are you sure you want to unlink this Jira ticket?')) return;
+
+    try {
+      await dispatch(unlinkJiraTicket(issueId)).unwrap();
+      toast.success('Jira ticket unlinked successfully');
+      // Refetch to update UI
+      dispatch(fetchIssueById(issueId));
+    } catch (error) {
+      toast.error(error || 'Failed to unlink Jira ticket');
     }
   };
 
@@ -480,6 +535,79 @@ export default function IssueDetailPage() {
                 <p className="text-sm font-bold">{issue.severity}/10</p>
               </div>
             </div>
+          </Card>
+
+          {/* Jira Integration */}
+          <Card className="p-6">
+            <h2 className="text-lg font-semibold mb-4">Jira Integration</h2>
+            {issue.jiraTicket ? (
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm text-muted-foreground mb-1">Jira Ticket</label>
+                  <a
+                    href={issue.jiraTicket.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center text-sm text-blue-600 hover:underline"
+                  >
+                    {issue.jiraTicket.key}
+                    <ExternalLink className="h-3 w-3 ml-1" />
+                  </a>
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground mb-1">Jira Status</label>
+                  <p className="text-sm">{issue.jiraTicket.status || 'N/A'}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleSyncJiraTicket}
+                    disabled={syncingJiraTicket}
+                  >
+                    {syncingJiraTicket ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        Syncing...
+                      </>
+                    ) : (
+                      'Sync Status'
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={handleUnlinkJiraTicket}
+                  >
+                    Unlink
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  No Jira ticket linked to this issue.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={handleCreateJiraTicket}
+                  disabled={creatingJiraTicket}
+                  className="w-full"
+                >
+                  {creatingJiraTicket ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Creating Ticket...
+                    </>
+                  ) : (
+                    'Create Jira Ticket'
+                  )}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Configure your personal Jira account in organization settings to create tickets.
+                </p>
+              </div>
+            )}
           </Card>
         </div>
       </div>
