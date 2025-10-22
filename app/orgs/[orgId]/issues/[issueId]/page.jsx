@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import {
   fetchIssueById,
   updateIssue,
-  updateStatus,
+  updateIssueStatus,
   assignIssue,
   addComment,
   voteOnIssue,
@@ -109,7 +109,7 @@ export default function IssueDetailPage() {
 
   const handleStatusChange = async (newStatus) => {
     try {
-      await dispatch(updateStatus({ issueId, status: newStatus })).unwrap();
+      await dispatch(updateIssueStatus({ issueId, status: newStatus })).unwrap();
       toast.success('Status updated successfully');
       // Refetch to get updated data
       dispatch(fetchIssueById(issueId));
@@ -181,11 +181,18 @@ export default function IssueDetailPage() {
   const handleCreateJiraTicket = async () => {
     setCreatingJiraTicket(true);
     try {
+      // Map issue priority to Jira priority format
+      const priorityMap = {
+        'low': 'Low',
+        'medium': 'Medium',
+        'high': 'High',
+        'critical': 'Highest'
+      };
+
       const ticketData = {
-        summary: issue.title,
+        title: issue.title,
         description: issue.description,
-        priority: issue.priority,
-        issueType: 'Bug',
+        priority: priorityMap[issue.priority] || 'Medium',
       };
 
       await dispatch(createJiraTicket({ issueId, orgId, ticketData })).unwrap();
@@ -540,23 +547,23 @@ export default function IssueDetailPage() {
           {/* Jira Integration */}
           <Card className="p-6">
             <h2 className="text-lg font-semibold mb-4">Jira Integration</h2>
-            {issue.jiraTicket ? (
+            {issue.jiraTicket && issue.jiraTicket.ticketKey ? (
               <div className="space-y-3">
                 <div>
                   <label className="text-sm text-muted-foreground mb-1">Jira Ticket</label>
                   <a
-                    href={issue.jiraTicket.url}
+                    href={issue.jiraTicket.ticketUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center text-sm text-blue-600 hover:underline"
                   >
-                    {issue.jiraTicket.key}
+                    {issue.jiraTicket.ticketKey}
                     <ExternalLink className="h-3 w-3 ml-1" />
                   </a>
                 </div>
                 <div>
-                  <label className="text-sm text-muted-foreground mb-1">Jira Status</label>
-                  <p className="text-sm">{issue.jiraTicket.status || 'N/A'}</p>
+                  <label className="text-sm text-muted-foreground mb-1">Created</label>
+                  <p className="text-sm">{issue.jiraTicket.createdAt ? format(new Date(issue.jiraTicket.createdAt), 'MMM d, yyyy h:mm a') : 'N/A'}</p>
                 </div>
                 <div className="flex gap-2">
                   <Button
