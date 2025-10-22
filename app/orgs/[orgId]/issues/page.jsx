@@ -36,6 +36,7 @@ import CreateIssueDialog from '@/components/issues/CreateIssueDialog';
 import IssueFilters from '@/components/issues/IssueFilters';
 import NotifyMembersDialog from '@/components/issues/NotifyMembersDialog';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import AppLayout from '@/components/layout/app-layout';
 
 export default function IssuesPage() {
   const params = useParams();
@@ -117,9 +118,10 @@ export default function IssuesPage() {
   );
 
   return (
-    <div className="container mx-auto p-4 md:p-6 lg:p-8 max-w-7xl">
-      {/* Back Button */}
-      <Button
+    <AppLayout>
+      <div className="container mx-auto p-4 md:p-6 lg:p-8 max-w-7xl">
+        {/* Back Button */}
+        <Button
         variant="ghost"
         size="sm"
         onClick={() => router.push(`/orgs/${orgId}`)}
@@ -354,6 +356,7 @@ export default function IssuesPage() {
         onConfirm={handleNotifyMembers}
         loading={notifying}
       />
-    </div>
+      </div>
+    </AppLayout>
   );
 }

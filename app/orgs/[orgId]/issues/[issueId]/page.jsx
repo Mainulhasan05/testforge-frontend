@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import AppLayout from '@/components/layout/app-layout';
 
 export default function IssueDetailPage() {
   const params = useParams();
@@ -75,9 +76,25 @@ export default function IssueDetailPage() {
 
   const handleSaveEdit = async () => {
     try {
-      await dispatch(updateIssue({ issueId, data: editData })).unwrap();
+      // Validate required fields
+      if (!editData.title || !editData.description) {
+        toast.error('Title and description are required');
+        return;
+      }
+
+      // Send all editable fields (validator requires at least 1 key)
+      const updateData = {
+        title: editData.title,
+        description: editData.description,
+        priority: editData.priority,
+        category: editData.category,
+      };
+
+      await dispatch(updateIssue({ issueId, data: updateData })).unwrap();
       toast.success('Issue updated successfully');
       setIsEditing(false);
+      // Refetch to get updated data
+      dispatch(fetchIssueById(issueId));
     } catch (error) {
       toast.error(error || 'Failed to update issue');
     }
@@ -176,11 +193,13 @@ export default function IssueDetailPage() {
 
   if (loading || !issue) {
     return (
-      <div className="container mx-auto p-4 md:p-6 lg:p-8 max-w-7xl">
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <AppLayout>
+        <div className="container mx-auto p-4 md:p-6 lg:p-8 max-w-7xl">
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
@@ -192,18 +211,19 @@ export default function IssueDetailPage() {
   const userVoteType = userVote?.voteType;
 
   return (
-    <div className="container mx-auto p-4 md:p-6 lg:p-8 max-w-7xl">
-      {/* Header */}
-      <div className="mb-6">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.push(`/orgs/${orgId}/issues`)}
-          className="mb-4"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Issues
-        </Button>
+    <AppLayout>
+      <div className="container mx-auto p-4 md:p-6 lg:p-8 max-w-7xl">
+        {/* Header */}
+        <div className="mb-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push(`/orgs/${orgId}/issues`)}
+            className="mb-4"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Issues
+          </Button>
 
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
           <div className="flex-1">
@@ -463,6 +483,7 @@ export default function IssueDetailPage() {
           </Card>
         </div>
       </div>
-    </div>
+      </div>
+    </AppLayout>
   );
 }

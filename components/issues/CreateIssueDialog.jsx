@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useDispatch } from 'react-redux';
-import { createIssue } from '@/lib/slices/issuesSlice';
+import { useDispatch, useSelector } from 'react-redux';
+import { createIssue, fetchIssues } from '@/lib/slices/issuesSlice';
 import {
   Dialog,
   DialogContent,
@@ -27,6 +27,7 @@ import { Upload, X, Image as ImageIcon } from 'lucide-react';
 
 export default function CreateIssueDialog({ open, onOpenChange, orgId }) {
   const dispatch = useDispatch();
+  const { filters } = useSelector((state) => state.issues);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -86,6 +87,10 @@ export default function CreateIssueDialog({ open, onOpenChange, orgId }) {
       await dispatch(createIssue({ orgId, issueData })).unwrap();
 
       toast.success('Issue created successfully');
+
+      // Refetch issues to update list and stats
+      dispatch(fetchIssues({ orgId, filters }));
+
       onOpenChange(false);
       resetForm();
     } catch (error) {
