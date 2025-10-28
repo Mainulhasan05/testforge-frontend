@@ -117,6 +117,8 @@ export default function SessionDetailPage() {
   const [updating, setUpdating] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState(null);
+  const [testerToRemove, setTesterToRemove] = useState(null);
+  const [testerStats, setTesterStats] = useState({});
 
   useEffect(() => {
     if (sessionId) {
@@ -240,6 +242,7 @@ export default function SessionDetailPage() {
       setSelectedUserId("");
       setIsAssignOpen(false);
       toast.success("User assigned successfully");
+      fetchTesterStats(); // Refresh stats after assignment
     } catch (err) {
       toast.error(err || "Failed to assign user");
     }
@@ -249,8 +252,73 @@ export default function SessionDetailPage() {
     try {
       await dispatch(unassignUserFromSession({ sessionId, userId })).unwrap();
       toast.success("User unassigned successfully");
+      setTesterToRemove(null);
+      fetchTesterStats(); // Refresh stats after removal
     } catch (err) {
       toast.error(err || "Failed to unassign user");
+    }
+  };
+
+  const fetchTesterStats = async () => {
+    if (!currentSession?.assignees || currentSession.assignees.length === 0) {
+      setTesterStats({});
+      return;
+    }
+
+    try {
+      // Fetch all feedback for this session to calculate stats
+      const response = await realApi.sessions.getTestResults(sessionId, {});
+      if (response.success && response.data) {
+        const stats = {};
+
+        // Initialize stats for each tester
+        currentSession.assignees.forEach(tester => {
+          stats[tester._id] = {
+            totalTestCases: 0,
+            testedCases: 0,
+            passedCases: 0,
+            failedCases: 0,
+            completionRate: 0,
+            passRate: 0,
+          };
+        });
+
+        // Count total test cases
+        const totalCases = response.data.features?.reduce((sum, feature) =>
+          sum + (feature.cases?.length || 0), 0) || 0;
+
+        // Calculate stats from feedback
+        response.data.features?.forEach(feature => {
+          feature.cases?.forEach(testCase => {
+            testCase.feedback?.forEach(fb => {
+              if (stats[fb.testerId]) {
+                stats[fb.testerId].testedCases++;
+                if (fb.result === 'pass') {
+                  stats[fb.testerId].passedCases++;
+                } else if (fb.result === 'fail') {
+                  stats[fb.testerId].failedCases++;
+                }
+              }
+            });
+          });
+        });
+
+        // Calculate rates
+        Object.keys(stats).forEach(testerId => {
+          const testerStat = stats[testerId];
+          testerStat.totalTestCases = totalCases;
+          testerStat.completionRate = totalCases > 0
+            ? Math.round((testerStat.testedCases / totalCases) * 100)
+            : 0;
+          testerStat.passRate = testerStat.testedCases > 0
+            ? Math.round((testerStat.passedCases / testerStat.testedCases) * 100)
+            : 0;
+        });
+
+        setTesterStats(stats);
+      }
+    } catch (error) {
+      console.error("Failed to fetch tester stats:", error);
     }
   };
 
@@ -599,7 +667,7 @@ export default function SessionDetailPage() {
               <BarChart3 className="h-4 w-4" />
               <span className="hidden sm:inline">Analytics</span>
             </TabsTrigger>
-            <TabsTrigger value="testers" className="gap-2">
+            <TabsTrigger value="testers" onClick={fetchTesterStats} className="gap-2">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Testers</span>
             </TabsTrigger>
@@ -865,44 +933,124 @@ export default function SessionDetailPage() {
           </TabsContent>
 
           {/* Testers Tab */}
-          <TabsContent value="testers" className="mt-6">
+          <TabsContent value="testers" className="mt-6 space-y-6">
+            {/* Summary Stats */}
+            <div className="grid gap-4 md:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Testers</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{currentSession.assignees?.length || 0}</div>
+                  <p className="text-xs text-muted-foreground">Assigned to session</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Avg Completion</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-blue-600">
+                    {currentSession.assignees?.length > 0
+                      ? Math.round(
+                          Object.values(testerStats).reduce((sum, s) => sum + s.completionRate, 0) /
+                            currentSession.assignees.length
+                        )
+                      : 0}%
+                  </div>
+                  <p className="text-xs text-muted-foreground">Average completion rate</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Avg Pass Rate</CardTitle>
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-600">
+                    {currentSession.assignees?.length > 0
+                      ? Math.round(
+                          Object.values(testerStats).reduce((sum, s) => sum + s.passRate, 0) /
+                            currentSession.assignees.length
+                        )
+                      : 0}%
+                  </div>
+                  <p className="text-xs text-muted-foreground">Average pass rate</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Tested</CardTitle>
+                  <Activity className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {Object.values(testerStats).reduce((sum, s) => sum + s.testedCases, 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Test cases completed</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Testers List */}
             <Card>
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Assigned Testers ({currentSession.assignees?.length || 0})
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Team Members
                   </CardTitle>
                   <Dialog open={isAssignOpen} onOpenChange={setIsAssignOpen}>
                     <DialogTrigger asChild>
-                      <Button size="sm" variant="outline" className="gap-2 w-full sm:w-auto">
+                      <Button className="gap-2 w-full sm:w-auto">
                         <UserPlus className="h-4 w-4" />
-                        Assign User
+                        Assign Tester
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
+                    <DialogContent className="sm:max-w-[500px]">
                       <DialogHeader>
-                        <DialogTitle>Assign User to Session</DialogTitle>
+                        <DialogTitle>Assign Tester to Session</DialogTitle>
                         <DialogDescription>
-                          Select a team member to assign to this testing session
+                          Select a team member to assign to this testing session. They will receive an email notification.
                         </DialogDescription>
                       </DialogHeader>
                       <div className="grid gap-4 py-4">
                         <div className="space-y-2">
-                          <Label htmlFor="user">Team Member</Label>
+                          <Label htmlFor="user">Select Team Member</Label>
                           <Select
                             value={selectedUserId}
                             onValueChange={setSelectedUserId}
                           >
-                            <SelectTrigger id="user">
-                              <SelectValue placeholder="Select a user" />
+                            <SelectTrigger id="user" className="h-12">
+                              <SelectValue placeholder="Choose a user to assign..." />
                             </SelectTrigger>
                             <SelectContent>
-                              {unassignedMembers.map((member) => (
-                                <SelectItem key={member._id} value={member._id}>
-                                  {member.fullName || member.email}
-                                </SelectItem>
-                              ))}
+                              {unassignedMembers.length === 0 ? (
+                                <div className="p-4 text-center text-sm text-muted-foreground">
+                                  All organization members are already assigned
+                                </div>
+                              ) : (
+                                unassignedMembers.map((member) => (
+                                  <SelectItem key={member._id} value={member._id} className="py-3">
+                                    <div className="flex items-center gap-3">
+                                      <Avatar className="h-8 w-8">
+                                        <AvatarFallback className="text-xs">
+                                          {getInitials(member.fullName || "U")}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div className="text-left">
+                                        <div className="font-medium">{member.fullName}</div>
+                                        <div className="text-xs text-muted-foreground">{member.email}</div>
+                                      </div>
+                                    </div>
+                                  </SelectItem>
+                                ))
+                              )}
                             </SelectContent>
                           </Select>
                         </div>
@@ -917,7 +1065,8 @@ export default function SessionDetailPage() {
                           Cancel
                         </Button>
                         <Button onClick={handleAssign} disabled={!selectedUserId} className="w-full sm:w-auto">
-                          Assign
+                          <UserPlus className="h-4 w-4 mr-2" />
+                          Assign Tester
                         </Button>
                       </DialogFooter>
                     </DialogContent>
@@ -925,35 +1074,102 @@ export default function SessionDetailPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                {currentSession.assignees &&
-                currentSession.assignees.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {currentSession.assignees.map((assignee) => (
-                      <div
-                        key={assignee._id}
-                        className="flex items-center gap-2 bg-secondary/50 rounded-full pl-1 pr-3 py-1"
-                      >
-                        <Avatar className="h-6 w-6">
-                          <AvatarFallback className="text-xs">
-                            {getInitials(assignee?.fullName || "U")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm">{assignee?.fullName}</span>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-4 w-4 p-0 hover:bg-destructive/20"
-                          onClick={() => handleUnassign(assignee._id)}
-                        >
-                          ×
-                        </Button>
-                      </div>
-                    ))}
+                {currentSession.assignees && currentSession.assignees.length > 0 ? (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {currentSession.assignees.map((assignee) => {
+                      const stats = testerStats[assignee._id] || {
+                        totalTestCases: 0,
+                        testedCases: 0,
+                        passedCases: 0,
+                        failedCases: 0,
+                        completionRate: 0,
+                        passRate: 0,
+                      };
+
+                      return (
+                        <Card key={assignee._id} className="border-l-4 border-l-primary/40">
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-12 w-12">
+                                  <AvatarFallback className="text-sm font-semibold">
+                                    {getInitials(assignee?.fullName || "U")}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <h4 className="font-semibold text-base">{assignee?.fullName}</h4>
+                                  <p className="text-sm text-muted-foreground">{assignee?.email}</p>
+                                </div>
+                              </div>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                                onClick={() => setTesterToRemove(assignee)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+
+                            {/* Progress Bar */}
+                            <div className="mb-3">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs font-medium text-muted-foreground">Progress</span>
+                                <span className="text-xs font-bold text-primary">{stats.completionRate}%</span>
+                              </div>
+                              <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-500"
+                                  style={{ width: `${stats.completionRate}%` }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Stats Grid */}
+                            <div className="grid grid-cols-3 gap-2">
+                              <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-2 text-center">
+                                <div className="text-lg font-bold text-blue-600">{stats.testedCases}</div>
+                                <div className="text-xs text-muted-foreground">Tested</div>
+                              </div>
+                              <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-2 text-center">
+                                <div className="text-lg font-bold text-green-600">{stats.passedCases}</div>
+                                <div className="text-xs text-muted-foreground">Passed</div>
+                              </div>
+                              <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-2 text-center">
+                                <div className="text-lg font-bold text-red-600">{stats.failedCases}</div>
+                                <div className="text-xs text-muted-foreground">Failed</div>
+                              </div>
+                            </div>
+
+                            {/* Pass Rate Badge */}
+                            {stats.testedCases > 0 && (
+                              <div className="mt-3 flex items-center justify-between">
+                                <span className="text-xs text-muted-foreground">Pass Rate</span>
+                                <Badge
+                                  variant={stats.passRate >= 80 ? "default" : stats.passRate >= 50 ? "secondary" : "destructive"}
+                                  className="font-semibold"
+                                >
+                                  {stats.passRate}%
+                                </Badge>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No assignees yet
-                  </p>
+                  <div className="text-center py-12">
+                    <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                    <h3 className="text-lg font-semibold mb-2">No testers assigned</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Assign team members to start testing this session
+                    </p>
+                    <Button onClick={() => setIsAssignOpen(true)}>
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Assign First Tester
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -1345,6 +1561,58 @@ export default function SessionDetailPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove Tester Confirmation Dialog */}
+      <Dialog open={!!testerToRemove} onOpenChange={() => setTesterToRemove(null)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Remove Tester from Session
+            </DialogTitle>
+            <DialogDescription>
+              This action will remove the tester from this testing session.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <Avatar className="h-12 w-12">
+                  <AvatarFallback className="text-sm font-semibold bg-destructive/20">
+                    {getInitials(testerToRemove?.fullName || "U")}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h4 className="font-semibold text-base">{testerToRemove?.fullName}</h4>
+                  <p className="text-sm text-muted-foreground">{testerToRemove?.email}</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Are you sure you want to remove <span className="font-semibold text-foreground">{testerToRemove?.fullName}</span> from this session?
+                They will lose access to test cases and won't receive further notifications about this session.
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setTesterToRemove(null)}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => handleUnassign(testerToRemove._id)}
+              className="w-full sm:w-auto"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Remove Tester
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
