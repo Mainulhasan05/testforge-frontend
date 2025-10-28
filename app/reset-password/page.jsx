@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CheckCircle2 } from "lucide-react"
 import Link from "next/link"
-import { fakeApi } from "@/lib/fakeApi"
+import { realApi } from "@/lib/realApi"
 
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -46,7 +46,7 @@ export default function ResetPasswordPage() {
     setStatus("loading")
 
     try {
-      await fakeApi.auth.resetPassword({ token, password })
+      await realApi.auth.resetPassword(token, password)
       setStatus("success")
       // Redirect to login after 2 seconds
       setTimeout(() => {
