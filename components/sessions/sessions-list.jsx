@@ -34,7 +34,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { formatLocalDate } from "@/lib/utils/time";
 import Link from "next/link";
-import { Plus, Calendar, PlayCircle } from "lucide-react";
+import {
+  Plus,
+  Calendar,
+  PlayCircle,
+  Users,
+  FileText,
+  CheckCircle2,
+  Clock,
+  Activity,
+  TrendingUp
+} from "lucide-react";
 
 export default function SessionsList({ orgId }) {
   const dispatch = useDispatch();
@@ -79,21 +89,18 @@ export default function SessionsList({ orgId }) {
       });
       dispatch(fetchSessions({ orgId, params: { page: 1, limit: 10 } }));
     } catch (err) {
-      console.error("[v0] Failed to create session:", err);
+      console.error("Failed to create session:", err);
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "active":
-        return "default";
-      case "completed":
-        return "secondary";
-      case "archived":
-        return "outline";
-      default:
-        return "secondary";
-    }
+  const getStatusBadge = (status) => {
+    const config = {
+      active: { variant: "default", icon: Activity, color: "text-green-600" },
+      completed: { variant: "secondary", icon: CheckCircle2, color: "text-blue-600" },
+      planned: { variant: "outline", icon: Clock, color: "text-orange-600" },
+      archived: { variant: "outline", icon: null, color: "text-gray-600" },
+    };
+    return config[status] || config.active;
   };
 
   return (
@@ -108,9 +115,15 @@ export default function SessionsList({ orgId }) {
               <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="active">Active</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="planned">Planned</SelectItem>
               <SelectItem value="archived">Archived</SelectItem>
             </SelectContent>
           </Select>
+          {meta?.total > 0 && (
+            <span className="text-sm text-muted-foreground">
+              {meta.total} {meta.total === 1 ? 'session' : 'sessions'}
+            </span>
+          )}
         </div>
 
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -190,6 +203,7 @@ export default function SessionsList({ orgId }) {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="planned">Planned</SelectItem>
                       <SelectItem value="completed">Completed</SelectItem>
                       <SelectItem value="archived">Archived</SelectItem>
                     </SelectContent>
@@ -212,7 +226,7 @@ export default function SessionsList({ orgId }) {
       </div>
 
       {status === "loading" && (
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-4">
           {[1, 2, 3].map((i) => (
             <Card key={i}>
               <CardHeader>
@@ -242,48 +256,117 @@ export default function SessionsList({ orgId }) {
 
       {status === "succeeded" && list.length > 0 && (
         <>
-          <div className="space-y-4">
-            {list.map((session) => (
-              <Link key={session._id} href={`/sessions/${session._id}`}>
-                <Card className="transition-colors hover:bg-accent cursor-pointer">
-                  <CardHeader>
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <CardTitle className="text-xl">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {list.map((session) => {
+              const statusConfig = getStatusBadge(session.status);
+              const StatusIcon = statusConfig.icon;
+              const progressPercent = session.completedCases && session.totalCases
+                ? Math.round((session.completedCases / session.totalCases) * 100)
+                : 0;
+
+              return (
+                <Link key={session._id} href={`/sessions/${session._id}`}>
+                  <Card className="h-full transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-primary/60 cursor-pointer group overflow-hidden">
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                    <CardHeader className="pb-4">
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-xl font-bold mb-2 group-hover:text-primary transition-colors line-clamp-1">
                             {session.title}
                           </CardTitle>
-                          <Badge variant={getStatusColor(session.status)}>
-                            {session.status}
-                          </Badge>
+                          <CardDescription className="line-clamp-2 text-sm leading-relaxed">
+                            {session?.description || "No description provided"}
+                          </CardDescription>
                         </div>
-                        <CardDescription className="line-clamp-2">
-                          {session?.description || "No description"}
-                        </CardDescription>
+                        <Badge
+                          variant={statusConfig.variant}
+                          className="flex items-center gap-1.5 px-3 py-1 shrink-0"
+                        >
+                          {StatusIcon && <StatusIcon className="h-3.5 w-3.5" />}
+                          <span className="capitalize font-medium">{session.status}</span>
+                        </Badge>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        <span>
+
+                      {/* Progress Bar */}
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-medium text-muted-foreground">Overall Progress</span>
+                          <span className="text-xs font-bold text-primary">{progressPercent}%</span>
+                        </div>
+                        <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-500"
+                            style={{ width: `${progressPercent}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Stats Grid */}
+                      <div className="grid grid-cols-2 gap-3 mb-4">
+                        <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/20 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+                          <div className="flex items-center gap-2 mb-1">
+                            <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Features</span>
+                          </div>
+                          <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                            {session.totalFeatures || 0}
+                          </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/30 dark:to-green-900/20 rounded-lg p-3 border border-green-200 dark:border-green-800">
+                          <div className="flex items-center gap-2 mb-1">
+                            <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                            <span className="text-xs font-medium text-green-700 dark:text-green-300">Test Cases</span>
+                          </div>
+                          <div className="text-2xl font-bold text-green-900 dark:text-green-100">
+                            {session.totalCases || 0}
+                          </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/30 dark:to-purple-900/20 rounded-lg p-3 border border-purple-200 dark:border-purple-800">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Users className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                            <span className="text-xs font-medium text-purple-700 dark:text-purple-300">Testers</span>
+                          </div>
+                          <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">
+                            {session.assignedTo?.length || 0}
+                          </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950/30 dark:to-orange-900/20 rounded-lg p-3 border border-orange-200 dark:border-orange-800">
+                          <div className="flex items-center gap-2 mb-1">
+                            <TrendingUp className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                            <span className="text-xs font-medium text-orange-700 dark:text-orange-300">Completed</span>
+                          </div>
+                          <div className="text-2xl font-bold text-orange-900 dark:text-orange-100">
+                            {session.completedCases || 0}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Date Info */}
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground pt-3 border-t">
+                        <Calendar className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">
                           {session.startDate
                             ? formatLocalDate(session.startDate)
-                            : "No start date"}{" "}
-                          -{" "}
+                            : "No start"}{" "}
+                          →{" "}
                           {session.endDate
                             ? formatLocalDate(session.endDate)
-                            : "No end date"}
+                            : "No end"}
                         </span>
                       </div>
-                    </div>
-                  </CardHeader>
-                </Card>
-              </Link>
-            ))}
+                    </CardHeader>
+                  </Card>
+                </Link>
+              );
+            })}
           </div>
 
           {meta.totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex items-center justify-center gap-2 pt-4">
               <Button
                 variant="outline"
                 disabled={page === 1}

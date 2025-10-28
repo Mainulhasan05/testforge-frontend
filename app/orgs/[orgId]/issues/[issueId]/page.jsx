@@ -9,6 +9,7 @@ import {
   updateIssueStatus,
   assignIssue,
   addComment,
+  deleteComment,
   voteOnIssue,
   removeVote,
   toggleWatch,
@@ -97,7 +98,7 @@ export default function IssueDetailPage() {
         category: editData.category,
       };
 
-      await dispatch(updateIssue({ issueId, data: updateData })).unwrap();
+      await dispatch(updateIssue({ issueId, issueData: updateData })).unwrap();
       toast.success('Issue updated successfully');
       setIsEditing(false);
       // Refetch to get updated data
@@ -135,6 +136,19 @@ export default function IssueDetailPage() {
     }
   };
 
+  const handleDeleteComment = async (commentId) => {
+    if (!confirm('Are you sure you want to delete this comment?')) return;
+
+    try {
+      await dispatch(deleteComment({ issueId, commentId })).unwrap();
+      toast.success('Comment deleted successfully');
+      // Refetch to get updated comments
+      dispatch(fetchIssueById(issueId));
+    } catch (error) {
+      toast.error(error || 'Failed to delete comment');
+    }
+  };
+
   const handleVote = async (voteType) => {
     try {
       // Check if user already voted this type - toggle behavior
@@ -161,6 +175,8 @@ export default function IssueDetailPage() {
     try {
       await dispatch(toggleWatch(issueId)).unwrap();
       toast.success(issue.watchers?.some(w => w._id === user._id) ? 'Stopped watching' : 'Now watching');
+      // Refetch to get updated watchers list
+      dispatch(fetchIssueById(issueId));
     } catch (error) {
       toast.error(error || 'Failed to toggle watch');
     }
@@ -377,11 +393,26 @@ export default function IssueDetailPage() {
             <div className="space-y-4 mb-6">
               {issue.comments?.map((comment) => (
                 <div key={comment._id} className="border-l-2 border-gray-200 pl-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-semibold">{comment.userId?.fullName || 'Unknown User'}</span>
-                    <span className="text-sm text-muted-foreground">
-                      {format(new Date(comment.createdAt), 'MMM d, yyyy h:mm a')}
-                    </span>
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{comment.userId?.fullName || 'Unknown User'}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {format(new Date(comment.createdAt), 'MMM d, yyyy h:mm a')}
+                      </span>
+                      {comment.edited && (
+                        <span className="text-xs text-muted-foreground italic">(edited)</span>
+                      )}
+                    </div>
+                    {(comment.userId?._id === user._id || comment.userId === user._id) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteComment(comment._id)}
+                        className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                   <p className="text-sm">{comment.text}</p>
                 </div>
@@ -407,47 +438,54 @@ export default function IssueDetailPage() {
 
           {/* Voting */}
           <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Community Feedback</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Community Feedback</h2>
+              <span className="text-sm text-muted-foreground">
+                {issue.votes?.length || 0} {issue.votes?.length === 1 ? 'vote' : 'votes'}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <Button
                 variant={userVoteType === 'confirm' ? 'default' : 'outline'}
                 onClick={() => handleVote('confirm')}
-                className="flex flex-col items-center py-4"
+                className="flex flex-col items-center justify-center py-6 h-auto transition-all hover:shadow-md"
               >
-                <ThumbsUp className="h-5 w-5 mb-1" />
-                <span className="text-xs">Confirm</span>
-                <span className="text-sm font-bold">{issue.voteStats?.confirm || 0}</span>
+                <ThumbsUp className="h-6 w-6 mb-2" />
+                <span className="text-sm font-medium mb-1">Confirm</span>
+                <span className="text-lg font-bold">{issue.voteStats?.confirm || 0}</span>
               </Button>
               <Button
                 variant={userVoteType === 'critical' ? 'default' : 'outline'}
                 onClick={() => handleVote('critical')}
-                className="flex flex-col items-center py-4"
+                className="flex flex-col items-center justify-center py-6 h-auto transition-all hover:shadow-md"
               >
-                <AlertCircle className="h-5 w-5 mb-1 text-red-500" />
-                <span className="text-xs">Critical</span>
-                <span className="text-sm font-bold">{issue.voteStats?.critical || 0}</span>
+                <AlertCircle className="h-6 w-6 mb-2 text-red-500" />
+                <span className="text-sm font-medium mb-1">Critical</span>
+                <span className="text-lg font-bold">{issue.voteStats?.critical || 0}</span>
               </Button>
               <Button
                 variant={userVoteType === 'cannot_reproduce' ? 'default' : 'outline'}
                 onClick={() => handleVote('cannot_reproduce')}
-                className="flex flex-col items-center py-4"
+                className="flex flex-col items-center justify-center py-6 h-auto transition-all hover:shadow-md"
               >
-                <span className="text-xs">Can't Reproduce</span>
-                <span className="text-sm font-bold">{issue.voteStats?.cannot_reproduce || 0}</span>
+                <span className="text-sm font-medium mb-1">Can't Reproduce</span>
+                <span className="text-lg font-bold">{issue.voteStats?.cannot_reproduce || 0}</span>
               </Button>
               <Button
                 variant={userVoteType === 'needs_info' ? 'default' : 'outline'}
                 onClick={() => handleVote('needs_info')}
-                className="flex flex-col items-center py-4"
+                className="flex flex-col items-center justify-center py-6 h-auto transition-all hover:shadow-md"
               >
-                <span className="text-xs">Needs Info</span>
-                <span className="text-sm font-bold">{issue.voteStats?.needs_info || 0}</span>
+                <span className="text-sm font-medium mb-1">Needs Info</span>
+                <span className="text-lg font-bold">{issue.voteStats?.needs_info || 0}</span>
               </Button>
             </div>
             {userVoteType && (
-              <p className="text-xs text-muted-foreground mt-2 text-center">
-                Click your vote again to remove it
-              </p>
+              <div className="mt-4 p-3 bg-muted rounded-md">
+                <p className="text-sm text-muted-foreground text-center">
+                  You voted: <span className="font-semibold capitalize">{userVoteType.replace('_', ' ')}</span> • Click again to remove
+                </p>
+              </div>
             )}
           </Card>
         </div>

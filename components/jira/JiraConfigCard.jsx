@@ -82,13 +82,21 @@ export default function JiraConfigCard({ orgId }) {
   };
 
   const handleSave = async () => {
+    // Validate required fields
     if (!formData.jiraUrl || !formData.jiraEmail || !formData.jiraProjectKey) {
-      toast.error("Please fill in all required fields");
+      toast.error("Please fill in Jira URL, Email, and Project Key");
       return;
     }
 
+    // For new configurations, API token is required
     if (!config && !formData.jiraApiToken) {
-      toast.error("API Token is required for new configuration");
+      toast.error("API Token is required for new configuration. Get it from the link above.");
+      return;
+    }
+
+    // Warn if trying to save without token on new config
+    if (!config && formData.jiraApiToken.trim().length < 10) {
+      toast.error("API Token seems too short. Please copy the full token from Atlassian.");
       return;
     }
 
@@ -97,12 +105,18 @@ export default function JiraConfigCard({ orgId }) {
       const response = await realApi.jira.saveConfig(orgId, formData);
 
       setConfig(response.data);
-      toast.success("Jira configuration saved successfully");
+      toast.success("Jira configuration saved successfully!");
 
       // Clear the API token field
       setFormData(prev => ({ ...prev, jiraApiToken: "" }));
     } catch (error) {
-      toast.error(error.message || "Failed to save configuration");
+      const errorMessage = error.message || "Failed to save configuration";
+      toast.error(errorMessage);
+
+      // Show more helpful message for token errors
+      if (errorMessage.includes('jiraApiToken') || errorMessage.includes('token')) {
+        toast.error("Please check your API token and try again", { duration: 5000 });
+      }
     } finally {
       setSaving(false);
     }
@@ -144,7 +158,7 @@ export default function JiraConfigCard({ orgId }) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Jira Integration</CardTitle>
+            <CardTitle>Jira Integration (Personal)</CardTitle>
             <CardDescription>
               Connect your Jira account to create tickets automatically
             </CardDescription>
@@ -157,25 +171,32 @@ export default function JiraConfigCard({ orgId }) {
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        <Alert>
-          <Info className="h-4 w-4" />
+        <Alert className="border-blue-200 bg-blue-50">
+          <Info className="h-4 w-4 text-blue-600" />
           <AlertDescription>
-            <div className="space-y-1">
-              <p className="font-medium">How to get your Jira API Token:</p>
-              <ol className="list-decimal list-inside space-y-1 text-sm">
-                <li>Go to <a
+            <div className="space-y-2">
+              <p className="font-semibold text-blue-900">Get your Jira API Token:</p>
+              <div className="bg-white rounded-md p-3 border border-blue-100">
+                <a
                   href="https://id.atlassian.com/manage-profile/security/api-tokens"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-primary hover:underline inline-flex items-center gap-1"
+                  className="text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-2 font-medium text-base"
                 >
-                  Atlassian API Tokens
-                  <ExternalLink className="h-3 w-3" />
-                </a></li>
-                <li>Click "Create API token"</li>
-                <li>Give it a name (e.g., "TestForge")</li>
-                <li>Copy the token and paste it below</li>
+                  https://id.atlassian.com/manage-profile/security/api-tokens
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              </div>
+              <ol className="list-decimal list-inside space-y-1.5 text-sm text-gray-700 ml-1">
+                <li>Click the link above to open Atlassian API Tokens page</li>
+                <li>Click <span className="font-semibold">"Create API token"</span> button</li>
+                <li>Give it a label (e.g., "TestForge Integration")</li>
+                <li>Copy the generated token immediately</li>
+                <li>Paste it in the "API Token" field below</li>
               </ol>
+              <p className="text-xs text-muted-foreground italic mt-2">
+                Note: You won't be able to see the token again after closing the dialog
+              </p>
             </div>
           </AlertDescription>
         </Alert>
@@ -212,22 +233,30 @@ export default function JiraConfigCard({ orgId }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="jiraApiToken">
+            <Label htmlFor="jiraApiToken" className="flex items-center gap-2">
               API Token {config ? "" : "*"}
+              {!config && (
+                <span className="text-xs font-normal text-red-600">
+                  (Required for new configuration)
+                </span>
+              )}
             </Label>
             <Input
               id="jiraApiToken"
               name="jiraApiToken"
               type="password"
-              placeholder={config ? "••••••••••••••••" : "Enter your Jira API token"}
+              placeholder={config ? "Leave empty to keep current token" : "Paste your Jira API token here"}
               value={formData.jiraApiToken}
               onChange={handleChange}
             />
-            <p className="text-xs text-muted-foreground">
-              {config
-                ? "Leave empty to keep existing token"
-                : "Your Jira API token (required for new setup)"}
-            </p>
+            <div className="flex items-start gap-1 text-xs text-muted-foreground">
+              <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
+              <p>
+                {config
+                  ? "Only enter a new token if you want to update it. Leave empty to keep your existing token."
+                  : "Get your token from the blue box above. This is required to connect to Jira."}
+              </p>
+            </div>
           </div>
 
           <div className="space-y-2">
