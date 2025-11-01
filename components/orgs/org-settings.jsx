@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useDispatch } from "react-redux"
+import { useDispatch, useSelector } from "react-redux"
 import { updateOrg, deleteOrg } from "@/lib/slices/orgsSlice"
 import { fetchJiraConfig, saveJiraConfig, testJiraConnection, deleteJiraConfig } from "@/lib/slices/issuesSlice"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,26 +11,29 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { Trash2, AlertTriangle } from "lucide-react"
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 
 export default function OrgSettings({ org }) {
   const dispatch = useDispatch()
   const router = useRouter()
+  const { user } = useSelector((state) => state.auth)
   const [formData, setFormData] = useState({
     name: org.name,
     description: org.description || "",
   })
   const [isSaving, setIsSaving] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [deleteConfirmation, setDeleteConfirmation] = useState("")
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Jira configuration state
   const [jiraConfig, setJiraConfig] = useState(null)
@@ -71,22 +74,41 @@ export default function OrgSettings({ org }) {
     e.preventDefault()
     setIsSaving(true)
     try {
-      await dispatch(updateOrg({ orgId: org.id, data: formData })).unwrap()
+      await dispatch(updateOrg({ orgId: org._id, data: formData })).unwrap()
+      toast.success("Organization updated successfully")
     } catch (err) {
       console.error("[v0] Failed to update org:", err)
+      toast.error(err || "Failed to update organization")
     } finally {
       setIsSaving(false)
     }
   }
 
   const handleDelete = async () => {
+    if (deleteConfirmation !== org.name) {
+      toast.error("Organization name doesn't match")
+      return
+    }
+
+    setIsDeleting(true)
     try {
-      await dispatch(deleteOrg(org.id)).unwrap()
+      await dispatch(deleteOrg(org._id)).unwrap()
+      toast.success("Organization deleted successfully")
       router.push("/orgs")
     } catch (err) {
       console.error("[v0] Failed to delete org:", err)
+      toast.error(err || "Failed to delete organization")
+    } finally {
+      setIsDeleting(false)
+      setIsDeleteDialogOpen(false)
+      setDeleteConfirmation("")
     }
   }
+
+  // Check if user is owner
+  const isOwner = user?.organizations?.find(
+    (o) => o.orgId === org._id && o.role === "owner"
+  )
 
   const handleSaveJira = async (e) => {
     e.preventDefault()
@@ -306,34 +328,100 @@ export default function OrgSettings({ org }) {
         </CardContent>
       </Card>
 
-      <Card className="border-destructive">
-        <CardHeader>
-          <CardTitle className="text-destructive">Danger Zone</CardTitle>
-          <CardDescription>Irreversible actions for this organization</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive">Delete Organization</Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete the organization and all associated data
-                  including sessions, features, and test cases.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </CardContent>
-      </Card>
+      {isOwner && (
+        <Card className="border-destructive">
+          <CardHeader>
+            <CardTitle className="text-destructive flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              Danger Zone
+            </CardTitle>
+            <CardDescription>Irreversible actions for this organization. Only organization owners can delete.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-destructive">Delete this organization</p>
+                  <p className="text-sm text-muted-foreground">
+                    Once you delete an organization, there is no going back. This will permanently delete:
+                  </p>
+                  <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1 mt-2">
+                    <li>All sessions and test data</li>
+                    <li>All features and test cases</li>
+                    <li>All issues and feedback</li>
+                    <li>All member access</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="destructive" className="w-full sm:w-auto">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Organization
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2 text-destructive">
+                    <AlertTriangle className="h-5 w-5" />
+                    Delete Organization
+                  </DialogTitle>
+                  <DialogDescription>
+                    This action cannot be undone. This will permanently delete the organization and all its data.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4">
+                    <p className="text-sm font-semibold mb-2">You are about to delete:</p>
+                    <p className="text-base font-bold">{org.name}</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-name">
+                      Type <span className="font-bold">{org.name}</span> to confirm
+                    </Label>
+                    <Input
+                      id="confirm-name"
+                      value={deleteConfirmation}
+                      onChange={(e) => setDeleteConfirmation(e.target.value)}
+                      placeholder="Enter organization name"
+                      className="font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      This will permanently delete all sessions, features, test cases, issues, and member access.
+                    </p>
+                  </div>
+                </div>
+                <DialogFooter className="flex-col sm:flex-row gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setIsDeleteDialogOpen(false)
+                      setDeleteConfirmation("")
+                    }}
+                    className="w-full sm:w-auto"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={handleDelete}
+                    disabled={deleteConfirmation !== org.name || isDeleting}
+                    className="w-full sm:w-auto"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    {isDeleting ? "Deleting..." : "Delete Organization"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
