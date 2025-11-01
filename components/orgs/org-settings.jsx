@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useDispatch, useSelector } from "react-redux"
 import { updateOrg, deleteOrg } from "@/lib/slices/orgsSlice"
+import { fetchMe } from "@/lib/slices/authSlice"
 import { fetchJiraConfig, saveJiraConfig, testJiraConnection, deleteJiraConfig } from "@/lib/slices/issuesSlice"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -48,6 +49,9 @@ export default function OrgSettings({ org }) {
   const [connectionTested, setConnectionTested] = useState(false)
 
   useEffect(() => {
+    // Fetch fresh user data to ensure organizations array is up-to-date
+    dispatch(fetchMe())
+
     // Fetch existing Jira config
     dispatch(fetchJiraConfig(org._id)).unwrap()
       .then((response) => {
@@ -105,10 +109,31 @@ export default function OrgSettings({ org }) {
     }
   }
 
-  // Check if user is owner
-  const isOwner = user?.organizations?.find(
-    (o) => o.orgId === org._id && o.role === "owner"
+  // Check if user is owner - using multiple methods for reliability
+  const isOwner = user && (
+    // Method 1: Check user's organizations array
+    user?.organizations?.some(
+      (o) => o.orgId?.toString() === org._id?.toString() && o.role === "owner"
+    ) ||
+    // Method 2: Check if user is in org's owners array
+    org?.owners?.some((ownerId) => {
+      const ownerIdStr = typeof ownerId === 'object' ? ownerId._id?.toString() : ownerId?.toString()
+      return ownerIdStr === user._id?.toString()
+    })
   )
+
+  // Debug log
+  useEffect(() => {
+    console.log('===== Organization Delete Button Debug =====')
+    console.log('User:', user)
+    console.log('User ID:', user?._id)
+    console.log('User organizations:', user?.organizations)
+    console.log('Current org:', org)
+    console.log('Current org ID:', org._id)
+    console.log('Org owners:', org?.owners)
+    console.log('Is owner (computed):', !!isOwner)
+    console.log('==========================================')
+  }, [user, org, isOwner])
 
   const handleSaveJira = async (e) => {
     e.preventDefault()

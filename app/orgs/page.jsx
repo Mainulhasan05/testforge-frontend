@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchOrgs, createOrg } from "@/lib/slices/orgsSlice";
+import { fetchMe } from "@/lib/slices/authSlice";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -59,6 +60,8 @@ export default function OrgsPage() {
       setIsCreateOpen(false);
       setFormData({ name: "", description: "" });
       dispatch(fetchOrgs({ page: 1, limit: 10 }));
+      // Refresh user data to update organizations array
+      dispatch(fetchMe());
     } catch (err) {
       console.error("[v0] Failed to create org:", err);
     }
